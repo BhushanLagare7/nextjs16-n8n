@@ -1,23 +1,17 @@
-import { Button } from "@/components/ui/button"
+import { db } from "@/prisma/db"
 
 /**
- * Default landing page shown after project setup.
+ * Server Component that queries the Neon database
+ * to verify Prisma 8 is fully operational.
  */
-export default function HomePage() {
+const Page = async () => {
+  const users = await db.orm.public.User.all()
+
   return (
-    <div className="flex min-h-svh p-6">
-      <div className="flex max-w-md min-w-0 flex-col gap-4 text-sm leading-loose">
-        <div>
-          <h1 className="font-medium">Project ready!</h1>
-          <p>You may now add components and start building.</p>
-          <p>We&apos;ve already added the button component for you.</p>
-          <Button className="mt-2">Button</Button>
-        </div>
-        {/* Hint about the dark mode hotkey defined in ThemeProvider */}
-        <div className="font-mono text-xs text-muted-foreground">
-          (Press <kbd>d</kbd> to toggle dark mode)
-        </div>
-      </div>
+    <div className="flex min-h-svh min-w-0 items-center justify-center p-6">
+      {JSON.stringify(users)}
     </div>
   )
 }
+
+export default Page
