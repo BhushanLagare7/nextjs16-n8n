@@ -1,24 +1,14 @@
-import { Suspense } from "react"
+import { requireAuth } from "@/lib/auth-utils"
+import { caller } from "@/trpc/server"
 
-import { HydrateClient, prefetch, trpc } from "@/trpc/server"
-
-import { Client } from "./client"
-
-/**
- * Server Component that queries the Neon database
- * to verify Prisma 8 is fully operational.
- */
 export default async function HomePage() {
-  // Prefetch users on the server so the client can hydrate immediately
-  void prefetch(trpc.getUsers.queryOptions())
+  await requireAuth()
+
+  const users = await caller.getUsers()
 
   return (
-    <div className="flex min-h-svh min-w-0 items-center justify-center p-6">
-      <HydrateClient>
-        <Suspense fallback={<p>Loading...</p>}>
-          <Client />
-        </Suspense>
-      </HydrateClient>
+    <div className="flex min-h-svh min-w-0 flex-col items-center justify-center p-6">
+      {JSON.stringify(users, null, 2)}
     </div>
   )
 }

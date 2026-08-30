@@ -1,6 +1,6 @@
 import { db } from "@/prisma/db"
 
-import { baseProcedure, createTRPCRouter } from "../init"
+import { createTRPCRouter, protectedProcedure } from "../init"
 
 /**
  * Root tRPC router.
@@ -8,7 +8,7 @@ import { baseProcedure, createTRPCRouter } from "../init"
  */
 export const appRouter = createTRPCRouter({
   /** Fetches all users from the database. */
-  getUsers: baseProcedure.query(async () => {
+  getUsers: protectedProcedure.query(async () => {
     return await db.orm.public.User.all()
   }),
 })

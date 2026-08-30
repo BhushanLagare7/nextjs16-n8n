@@ -1,6 +1,9 @@
 import { cache } from "react"
+import { headers } from "next/headers"
 
-import { initTRPC } from "@trpc/server"
+import { initTRPC, TRPCError } from "@trpc/server"
+
+import { auth } from "@/lib/auth"
 
 /**
  * Creates the tRPC context for each request.
@@ -30,4 +33,24 @@ export const createTRPCRouter = t.router
 
 export const createCallerFactory = t.createCallerFactory
 
+// Public procedure — no auth required
 export const baseProcedure = t.procedure
+
+/**
+ * Procedure that enforces authentication.
+ * Throws UNAUTHORIZED if no valid session exists,
+ * otherwise attaches the session to context as `auth`.
+ */
+export const protectedProcedure = baseProcedure.use(async ({ ctx, next }) => {
+  // Fetch session using incoming request headers
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  })
+
+  if (!session) {
+    throw new TRPCError({ code: "UNAUTHORIZED", message: "Unathorized" })
+  }
+
+  // Pass session down to downstream procedures via context
+  return next({ ctx: { ...ctx, auth: session } })
+})
