@@ -7,3 +7,5 @@ procs:
   # Next.js application dev server.
   next:
     cmd: ["npm", "run", "dev"]
+    env:
+      INNGEST_DEV: "1"

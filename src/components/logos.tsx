@@ -78,7 +78,9 @@ export function NodemationLogo({ size = 32, className, ...props }: LogoProps) {
       fill="none"
       height={size}
       viewBox="0 0 78 32"
-      width={typeof size === "number" ? (size * 78) / 32 : size}
+      width={
+        typeof size === "number" ? (size * 78) / 32 : `calc(${size} * 78 / 32)`
+      }
       xmlns="http://www.w3.org/2000/svg"
       {...props}
     >

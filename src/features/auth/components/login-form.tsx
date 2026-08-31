@@ -93,7 +93,7 @@ export function LoginForm() {
                     type="button"
                     variant="outline"
                   >
-                    <GithubLogo size={20} />
+                    <GithubLogo aria-hidden="true" size={20} />
                     Continue with GitHub
                   </Button>
                   <Button
@@ -102,7 +102,7 @@ export function LoginForm() {
                     type="button"
                     variant="outline"
                   >
-                    <GoogleLogo size={20} />
+                    <GoogleLogo aria-hidden="true" size={20} />
                     Continue with Google
                   </Button>
                 </div>
