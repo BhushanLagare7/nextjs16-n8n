@@ -8,9 +8,5 @@ export default async function SignupPage() {
   // Redirects to home if user is already logged in
   await requireUnauth()
 
-  return (
-    <div>
-      <RegisterForm />
-    </div>
-  )
+  return <RegisterForm />
 }

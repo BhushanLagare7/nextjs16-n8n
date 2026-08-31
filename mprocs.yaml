@@ -1,0 +1,9 @@
+# Process manager config: runs the Next.js app and the Inngest dev server side-by-side.
+procs:
+  # Local Inngest dev server for testing background functions.
+  inngest:
+    cmd: ["npm", "run", "inngest:dev"]
+
+  # Next.js application dev server.
+  next:
+    cmd: ["npm", "run", "dev"]

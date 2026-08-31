@@ -8,23 +8,26 @@ import { Toaster } from "@/components/ui/sonner"
 import { cn } from "@/lib/utils"
 import { TRPCReactProvider } from "@/trpc/client"
 
+/**
+ * Global metadata configuration.
+ */
 export const metadata: Metadata = {
   title: "Nodemation",
   description: "Nodemation application built with Next.js and shadcn/ui",
+  icons: {
+    icon: "/logos/logo.svg",
+  },
 }
 
-// Sans-serif font, exposed as CSS variable for Tailwind
+// Fonts configured as CSS variables for Tailwind integration
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" })
-
-// Monospace font, exposed as CSS variable for Tailwind
 const fontMono = Geist_Mono({
   subsets: ["latin"],
   variable: "--font-mono",
 })
 
 /**
- * Root layout applied to every page.
- * Sets up fonts and wraps the app with the theme provider & TRPC provider.
+ * Root application layout. Sets up fonts, providers, and global UI elements.
  */
 export default function RootLayout({
   children,
@@ -40,7 +43,7 @@ export default function RootLayout({
         geist.variable
       )}
       lang="en"
-      // Prevents hydration warnings caused by theme class mismatch on first render
+      // Suppresses hydration mismatches caused by browser extensions or dark-mode themes
       suppressHydrationWarning
     >
       <body>

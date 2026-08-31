@@ -8,9 +8,5 @@ export default async function LoginPage() {
   // Redirects to home if user is already logged in
   await requireUnauth()
 
-  return (
-    <div>
-      <LoginForm />
-    </div>
-  )
+  return <LoginForm />
 }
