@@ -19,6 +19,10 @@
     "verification": {
       "model": "Verification",
       "namespace": "public"
+    },
+    "workflow": {
+      "model": "Workflow",
+      "namespace": "public"
     }
   },
   "domain": {
@@ -478,6 +482,37 @@
               "namespaceId": "public",
               "table": "verification"
             }
+          },
+          "Workflow": {
+            "fields": {
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "name": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "id": {
+                  "column": "id"
+                },
+                "name": {
+                  "column": "name"
+                }
+              },
+              "namespaceId": "public",
+              "table": "workflow"
+            }
           }
         }
       }
@@ -790,6 +825,26 @@
                 "columns": ["id"]
               },
               "uniques": []
+            },
+            "workflow": {
+              "columns": {
+                "id": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "name": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": ["id"]
+              },
+              "uniques": []
             }
           }
         },
@@ -797,7 +852,25 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "fb6e39a56937c79378eaecd933ae471eaaa80f788d8aa769e0367d788382d57b"
+    "storageHash": "aa684e3acc31b74ce2bdfb8f918c8f5fc06f01962fe0dcb5be8c0e8c574eabe8"
+  },
+  "execution": {
+    "executionHash": "365f487de9ec2aeb2f30e98633072a2029416865b2f2c99e9a4fdaf2e926fa21",
+    "mutations": {
+      "defaults": [
+        {
+          "onCreate": {
+            "id": "cuid2",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "public",
+            "table": "workflow"
+          }
+        }
+      ]
+    }
   },
   "capabilities": {
     "postgres": {

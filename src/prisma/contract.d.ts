@@ -33,8 +33,9 @@ import type {
 } from "@prisma/orm-postgres/contract/types"
 
 export type StorageHash =
-  StorageHashBase<"fb6e39a56937c79378eaecd933ae471eaaa80f788d8aa769e0367d788382d57b">
-export type ExecutionHash = ExecutionHashBase<string>
+  StorageHashBase<"aa684e3acc31b74ce2bdfb8f918c8f5fc06f01962fe0dcb5be8c0e8c574eabe8">
+export type ExecutionHash =
+  ExecutionHashBase<"365f487de9ec2aeb2f30e98633072a2029416865b2f2c99e9a4fdaf2e926fa21">
 export type ProfileHash =
   ProfileHashBase<"3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2">
 
@@ -571,6 +572,10 @@ export type FieldOutputTypes = {
       readonly createdAt: TimestamptzString<3>
       readonly updatedAt: TimestamptzString<3>
     }
+    readonly Workflow: {
+      readonly id: CodecTypes["pg/text@1"]["output"]
+      readonly name: CodecTypes["pg/text@1"]["output"]
+    }
   }
 }
 export type FieldInputTypes = {
@@ -620,6 +625,10 @@ export type FieldInputTypes = {
       readonly createdAt: CodecTypes["pg/timestamptz-string@1"]["input"]
       readonly updatedAt: CodecTypes["pg/timestamptz-string@1"]["input"]
     }
+    readonly Workflow: {
+      readonly id: CodecTypes["pg/text@1"]["input"]
+      readonly name: CodecTypes["pg/text@1"]["input"]
+    }
   }
 }
 export type StorageColumnTypes = {
@@ -666,6 +675,10 @@ export type StorageColumnTypes = {
       readonly identifier: CodecTypes["pg/text@1"]["output"]
       readonly updatedAt: TimestamptzString<3>
       readonly value: CodecTypes["pg/text@1"]["output"]
+    }
+    readonly workflow: {
+      readonly id: CodecTypes["pg/text@1"]["output"]
+      readonly name: CodecTypes["pg/text@1"]["output"]
     }
   }
 }
@@ -715,6 +728,10 @@ export type StorageColumnInputTypes = {
       readonly identifier: CodecTypes["pg/text@1"]["input"]
       readonly updatedAt: CodecTypes["pg/timestamptz-string@1"]["input"]
       readonly value: CodecTypes["pg/text@1"]["input"]
+    }
+    readonly workflow: {
+      readonly id: CodecTypes["pg/text@1"]["input"]
+      readonly name: CodecTypes["pg/text@1"]["input"]
     }
   }
 }
@@ -999,6 +1016,24 @@ type ContractBase = Omit<
               ]
               foreignKeys: readonly []
             }
+            readonly workflow: {
+              columns: {
+                readonly id: {
+                  readonly nativeType: "text"
+                  readonly codecId: "pg/text@1"
+                  readonly nullable: false
+                }
+                readonly name: {
+                  readonly nativeType: "text"
+                  readonly codecId: "pg/text@1"
+                  readonly nullable: false
+                }
+              }
+              primaryKey: { readonly columns: readonly ["id"] }
+              uniques: readonly []
+              indexes: readonly []
+              foreignKeys: readonly []
+            }
           }
         }
       }
@@ -1025,6 +1060,10 @@ type ContractBase = Omit<
     readonly verification: {
       readonly namespace: "public" & NamespaceId
       readonly model: "Verification"
+    }
+    readonly workflow: {
+      readonly namespace: "public" & NamespaceId
+      readonly model: "Workflow"
     }
   }
   readonly domain: {
@@ -1395,6 +1434,33 @@ type ContractBase = Omit<
               }
             }
           }
+          readonly Workflow: {
+            readonly fields: {
+              readonly id: {
+                readonly nullable: false
+                readonly type: {
+                  readonly kind: "scalar"
+                  readonly codecId: "pg/text@1"
+                }
+              }
+              readonly name: {
+                readonly nullable: false
+                readonly type: {
+                  readonly kind: "scalar"
+                  readonly codecId: "pg/text@1"
+                }
+              }
+            }
+            readonly relations: Record<string, never>
+            readonly storage: {
+              readonly table: "workflow"
+              readonly namespaceId: "public"
+              readonly fields: {
+                readonly id: { readonly column: "id" }
+                readonly name: { readonly column: "name" }
+              }
+            }
+          }
         }
       }
     }
@@ -1418,6 +1484,24 @@ type ContractBase = Omit<
     }
   }
   readonly extensions: {}
+  readonly execution: {
+    readonly executionHash: ExecutionHash
+    readonly mutations: {
+      readonly defaults: readonly [
+        {
+          readonly ref: {
+            readonly namespace: "public"
+            readonly table: "workflow"
+            readonly column: "id"
+          }
+          readonly onCreate: {
+            readonly kind: "generator"
+            readonly id: "cuid2"
+          }
+        },
+      ]
+    }
+  }
   readonly meta: {}
 
   readonly profileHash: ProfileHash

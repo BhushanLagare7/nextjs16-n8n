@@ -8,6 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { toast } from "sonner"
 import { z } from "zod"
 
+import { GithubLogo, GoogleLogo } from "@/components/logos"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -92,6 +93,7 @@ export function LoginForm() {
                     type="button"
                     variant="outline"
                   >
+                    <GithubLogo aria-hidden="true" size={20} />
                     Continue with GitHub
                   </Button>
                   <Button
@@ -100,6 +102,7 @@ export function LoginForm() {
                     type="button"
                     variant="outline"
                   >
+                    <GoogleLogo aria-hidden="true" size={20} />
                     Continue with Google
                   </Button>
                 </div>
