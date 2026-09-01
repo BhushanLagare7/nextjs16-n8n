@@ -2,7 +2,7 @@
 import { serve } from "inngest/next"
 
 import { inngest } from "@/inngest/client"
-import { createWorkflow } from "@/inngest/functions"
+import { execute } from "@/inngest/functions"
 
 /**
  * Next.js route handler that exposes registered Inngest functions.
@@ -10,5 +10,5 @@ import { createWorkflow } from "@/inngest/functions"
  */
 export const { GET, POST, PUT } = serve({
   client: inngest,
-  functions: [createWorkflow],
+  functions: [execute],
 })

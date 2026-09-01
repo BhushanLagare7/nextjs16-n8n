@@ -18,6 +18,8 @@ const eslintConfig = defineConfig([
     "src/prisma/contract.d.ts",
     "src/prisma/contract.json",
     "migrations/**",
+    "agent/**",
+    ".agents/**",
   ]),
 
   // Custom JSX prop sorting (Reserved first, callbacks last)

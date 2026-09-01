@@ -1,41 +1,33 @@
 "use client"
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useMutation } from "@tanstack/react-query"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { useTRPC } from "@/trpc/client"
 
 /**
- * Home page.
- * Displays the list of workflows and provides a button to queue creation of a new one.
+ * Primary home page component containing actions to trigger AI workflows.
  */
 export default function HomePage() {
   const trpc = useTRPC()
 
-  // Fetch all existing workflows.
-  const { data: workflows } = useQuery(trpc.getWorkflows.queryOptions())
-  const queryClient = useQueryClient()
-
-  // Mutation that enqueues a workflow creation job.
-  // On success, notify the user and refetch the workflows list.
-  const create = useMutation(
-    trpc.createWorkflow.mutationOptions({
+  // Mutation to trigger the background AI pipeline via tRPC
+  const testAi = useMutation(
+    trpc.testAi.mutationOptions({
       onSuccess: () => {
-        toast.success("Workflow creation job queued")
-        queryClient.invalidateQueries(trpc.getWorkflows.queryOptions())
+        toast.success("AI Job queued")
       },
     })
   )
 
   return (
-    <div className="flex min-h-svh min-w-0 flex-col items-center justify-center p-6">
-      {/* Debug view of current workflows */}
-      {JSON.stringify(workflows, null, 2)}
-
-      <Button disabled={create.isPending} onClick={() => create.mutate()}>
-        Create
-      </Button>
+    <div className="flex min-h-svh min-w-0 flex-col items-center justify-center gap-4 p-6">
+      <div className="flex items-center gap-2">
+        <Button disabled={testAi.isPending} onClick={() => testAi.mutate()}>
+          {testAi.isPending ? "Queuing..." : "Test AI"}
+        </Button>
+      </div>
     </div>
   )
 }
