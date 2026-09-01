@@ -2,7 +2,7 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-export interface LogoProps extends React.SVGProps<SVGSVGElement> {
+export interface LogoProps extends React.ComponentProps<"svg"> {
   size?: number | string
 }
 
@@ -14,11 +14,12 @@ export function GithubLogo({ size = 20, className, ...props }: LogoProps) {
   return (
     <svg
       aria-label="GitHub logo"
-      className={cn("text-foreground", className)}
+      className={cn("shrink-0 text-foreground", className)}
+      data-slot="logo"
       fill="currentColor"
       height={size}
       viewBox="0 0 98 96"
-      width={size}
+      width={typeof size === "number" ? (size * 98) / 96 : size}
       xmlns="http://www.w3.org/2000/svg"
       {...props}
     >
@@ -39,7 +40,8 @@ export function GoogleLogo({ size = 20, className, ...props }: LogoProps) {
   return (
     <svg
       aria-label="Google logo"
-      className={className}
+      className={cn("shrink-0", className)}
+      data-slot="logo"
       height={size}
       viewBox="0 0 24 24"
       width={size}
@@ -70,11 +72,12 @@ export function GoogleLogo({ size = 20, className, ...props }: LogoProps) {
  * Nodemation Brand Logo Component
  * High-contrast responsive gradient tones across light & dark themes.
  */
-export function NodemationLogo({ size = 32, className, ...props }: LogoProps) {
+export function NodemationLogo({ size = 24, className, ...props }: LogoProps) {
   return (
     <svg
       aria-label="Nodemation logo"
-      className={className}
+      className={cn("shrink-0", className)}
+      data-slot="logo"
       fill="none"
       height={size}
       viewBox="0 0 78 32"

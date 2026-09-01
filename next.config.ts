@@ -2,8 +2,23 @@ import type { NextConfig } from "next"
 
 import { withSentryConfig } from "@sentry/nextjs/config"
 
-const nextConfig: NextConfig = {/* config options here */}
+/**
+ * Next.js configuration
+ */
+const nextConfig: NextConfig = {
+  async redirects() {
+    return [
+      {
+        // Redirect root path to workflows page
+        source: "/",
+        destination: "/workflows",
+        permanent: false,
+      },
+    ]
+  },
+}
 
+// Wrap config with Sentry for error monitoring and source map uploads
 export default withSentryConfig(nextConfig, {
   // For all available options, see:
   // https://www.npmjs.com/package/@sentry/webpack-plugin#options

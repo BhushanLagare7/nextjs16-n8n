@@ -3,6 +3,22 @@
 import * as React from "react"
 import { ThemeProvider as NextThemesProvider, useTheme } from "next-themes"
 
+// Suppress the false-positive React 19 warning for next-themes inline script in development
+if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
+  const originalError = console.error
+  console.error = (...args: unknown[]) => {
+    if (
+      typeof args[0] === "string" &&
+      args[0].includes(
+        "Encountered a script tag while rendering React component"
+      )
+    ) {
+      return
+    }
+    originalError.apply(console, args)
+  }
+}
+
 /**
  * Wraps the app with next-themes and adds a global "d" hotkey
  * to toggle between light and dark mode.
