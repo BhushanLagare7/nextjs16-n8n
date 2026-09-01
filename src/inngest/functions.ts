@@ -1,20 +1,63 @@
 // src/inngest/functions.ts
-import { db } from "@/prisma/db"
+import { createAnthropic } from "@ai-sdk/anthropic"
+import { createGoogle } from "@ai-sdk/google"
+import { createOpenAI } from "@ai-sdk/openai"
+import { generateText } from "ai"
 
 import { inngest } from "./client"
 
+// Initialize AI SDK providers
+const google = createGoogle()
+const openai = createOpenAI()
+const anthropic = createAnthropic()
+
 /**
- * Background function triggered by the `app/workflow.created` event.
- * Persists the new workflow to the database.
+ * Inngest background workflow to execute sequential text generation
+ * across multiple AI models (Gemini, OpenAI, Claude) using instrumented steps.
  */
-export const createWorkflow = inngest.createFunction(
-  { id: "create-workflow", triggers: { event: "app/workflow.created" } },
-  async ({ step, event }) => {
-    // Wrap the DB write in a step for retries and observability.
-    await step.run("handle-workflow", async () => {
-      return await db.orm.public.Workflow.create({
-        name: event.data.name,
-      })
-    })
+export const execute = inngest.createFunction(
+  { id: "execute-ai", triggers: { event: "execute/ai" } },
+  async ({ step }) => {
+    // Simulated delay
+    await step.sleep("pretend", "5s")
+
+    // 1. Generate text using Google Gemini
+    const { steps: geminiSteps } = await step.ai.wrap(
+      "gemini-generate-text",
+      generateText,
+      {
+        model: google("gemini-2.5-flash"),
+        instructions: "You are a helpful assistant.",
+        prompt: "What is 2 + 2?",
+      }
+    )
+
+    // 2. Generate text using OpenAI GPT-4
+    const { steps: openaiSteps } = await step.ai.wrap(
+      "openai-generate-text",
+      generateText,
+      {
+        model: openai("gpt-4"),
+        instructions: "You are a helpful assistant.",
+        prompt: "What is 2 + 2?",
+      }
+    )
+
+    // 3. Generate text using Anthropic Claude
+    const { steps: anthropicSteps } = await step.ai.wrap(
+      "anthropic-generate-text",
+      generateText,
+      {
+        model: anthropic("claude-sonnet-4-5"),
+        instructions: "You are a helpful assistant.",
+        prompt: "What is 2 + 2?",
+      }
+    )
+
+    return {
+      geminiSteps,
+      openaiSteps,
+      anthropicSteps,
+    }
   }
 )

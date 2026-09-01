@@ -42,3 +42,10 @@ next-env.d.ts
 node_modules/
 dist/
 .env
+
+# skills
+.agents/
+.claude/
+agent/
+skills-lock.json
+skills/
