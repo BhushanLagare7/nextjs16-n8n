@@ -4,6 +4,12 @@ import { headers } from "next/headers"
 import { initTRPC, TRPCError } from "@trpc/server"
 
 import { auth } from "@/lib/auth"
+import { polarClient } from "@/lib/polar"
+
+/**
+ * tRPC server setup with three procedure tiers:
+ * public -> protected (auth) -> premium (active subscription)
+ */
 
 /**
  * Creates the tRPC context for each request.
@@ -54,3 +60,30 @@ export const protectedProcedure = baseProcedure.use(async ({ ctx, next }) => {
   // Pass session down to downstream procedures via context
   return next({ ctx: { ...ctx, auth: session } })
 })
+
+/**
+ * Procedure that enforces an active subscription.
+ * Builds on `protectedProcedure`, so auth is guaranteed here.
+ * Throws FORBIDDEN if the user has no active subscription,
+ * otherwise attaches Polar customer data to context as `customer`.
+ */
+export const premiumProcedure = protectedProcedure.use(
+  async ({ ctx, next }) => {
+    // Look up subscription/customer state from Polar using the authenticated user's ID
+    const customer = await polarClient.customers.getStateExternal({
+      externalId: ctx.auth.user.id,
+    })
+
+    if (
+      !customer.activeSubscriptions ||
+      customer.activeSubscriptions.length === 0
+    ) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Active subscription required",
+      })
+    }
+
+    return next({ ctx: { ...ctx, customer } })
+  }
+)

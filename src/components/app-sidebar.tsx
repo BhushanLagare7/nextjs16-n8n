@@ -23,6 +23,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
+import { useHasActiveSubscription } from "@/features/subscriptions/hooks/use-subscription"
 import { authClient } from "@/lib/auth-client"
 
 import { NodemationLogo } from "./logos"
@@ -52,11 +53,13 @@ const menuItems = [
 ]
 
 /**
- * Main application sidebar with navigation, branding, and user actions
+ * Main application sidebar with navigation, branding, and user actions.
+ * Includes subscription upgrade prompt, billing portal access, and sign out.
  */
 export function AppSidebar() {
   const router = useRouter()
   const pathname = usePathname()
+  const { hasActiveSubscription, isLoading } = useHasActiveSubscription()
 
   return (
     <Sidebar collapsible="icon">
@@ -110,20 +113,23 @@ export function AppSidebar() {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton
-              className="h-10 gap-x-4 px-4"
-              tooltip="Upgrade to Pro"
-              onClick={() => {}}
-            >
-              <StarIcon className="size-4" />
-              <span>Upgrade to Pro</span>
-            </SidebarMenuButton>
+            {/* Only show upgrade prompt if user lacks an active subscription */}
+            {!hasActiveSubscription && !isLoading && (
+              <SidebarMenuButton
+                className="h-10 gap-x-4 px-4"
+                tooltip="Upgrade to Pro"
+                onClick={() => authClient.checkout({ slug: "pro" })}
+              >
+                <StarIcon className="size-4" />
+                <span>Upgrade to Pro</span>
+              </SidebarMenuButton>
+            )}
           </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton
               className="h-10 gap-x-4 px-4"
               tooltip="Billing Portal"
-              onClick={() => {}}
+              onClick={() => authClient.customer.portal()}
             >
               <CreditCardIcon className="size-4" />
               <span>Billing Portal</span>
