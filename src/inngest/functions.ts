@@ -2,6 +2,7 @@
 import { createAnthropic } from "@ai-sdk/anthropic"
 import { createGoogle } from "@ai-sdk/google"
 import { createOpenAI } from "@ai-sdk/openai"
+import * as Sentry from "@sentry/nextjs"
 import { generateText } from "ai"
 
 import { inngest } from "./client"
@@ -17,7 +18,20 @@ const anthropic = createAnthropic()
  */
 export const execute = inngest.createFunction(
   { id: "execute-ai", triggers: { event: "execute/ai" } },
-  async ({ step }) => {
+  async ({ event, step }) => {
+    // Group related LLM calls into a single conversation thread in Sentry
+    const conversationId =
+      (event.data?.conversationId as string) || `conv-${event.id || Date.now()}`
+    Sentry.setConversationId(conversationId)
+
+    // Identify user in Sentry for conversation attribution
+    if (event.data?.userId) {
+      Sentry.setUser({
+        id: event.data.userId as string,
+        email: event.data.email as string | undefined,
+      })
+    }
+
     // Simulated delay
     await step.sleep("pretend", "5s")
 
@@ -29,6 +43,12 @@ export const execute = inngest.createFunction(
         model: google("gemini-2.5-flash"),
         instructions: "You are a helpful assistant.",
         prompt: "What is 2 + 2?",
+        experimental_telemetry: {
+          isEnabled: true,
+          functionId: "gemini_generate_text",
+          recordInputs: true,
+          recordOutputs: true,
+        },
       }
     )
 
@@ -40,6 +60,12 @@ export const execute = inngest.createFunction(
         model: openai("gpt-4"),
         instructions: "You are a helpful assistant.",
         prompt: "What is 2 + 2?",
+        experimental_telemetry: {
+          isEnabled: true,
+          functionId: "openai_generate_text",
+          recordInputs: true,
+          recordOutputs: true,
+        },
       }
     )
 
@@ -51,6 +77,12 @@ export const execute = inngest.createFunction(
         model: anthropic("claude-sonnet-4-5"),
         instructions: "You are a helpful assistant.",
         prompt: "What is 2 + 2?",
+        experimental_telemetry: {
+          isEnabled: true,
+          functionId: "anthropic_generate_text",
+          recordInputs: true,
+          recordOutputs: true,
+        },
       }
     )
 
