@@ -11,4 +11,3 @@ export const polarClient = new Polar({
   // Access tokens obtained in Production are for instance not usable in the Sandbox environment.
   server: (process.env.POLAR_SERVER as "sandbox" | "production") ?? "sandbox",
 })
-

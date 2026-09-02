@@ -33,9 +33,9 @@ import type {
 } from "@prisma/orm-postgres/contract/types"
 
 export type StorageHash =
-  StorageHashBase<"8f5acda65a62422fdb34be3484ee45aabf11397f22a41ac32bbcf9408d75b1cf">
+  StorageHashBase<"c8d995fe4987431e422295d94464f859c379c00c065a101d9ba3b72cca678c08">
 export type ExecutionHash =
-  ExecutionHashBase<"c06fe060879e23614772049f17ef4db536a790a9a8cb70e65e5c2059f988f09b">
+  ExecutionHashBase<"365f487de9ec2aeb2f30e98633072a2029416865b2f2c99e9a4fdaf2e926fa21">
 export type ProfileHash =
   ProfileHashBase<"3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2">
 
@@ -1053,6 +1053,10 @@ type ContractBase = Omit<
                   readonly nativeType: "timestamptz"
                   readonly codecId: "pg/timestamptz-string@1"
                   readonly nullable: false
+                  readonly default: {
+                    readonly kind: "function"
+                    readonly expression: "now()"
+                  }
                 }
                 readonly userId: {
                   readonly nativeType: "text"
@@ -1596,21 +1600,6 @@ type ContractBase = Omit<
           readonly onCreate: {
             readonly kind: "generator"
             readonly id: "cuid2"
-          }
-        },
-        {
-          readonly ref: {
-            readonly namespace: "public"
-            readonly table: "workflow"
-            readonly column: "updatedAt"
-          }
-          readonly onCreate: {
-            readonly kind: "generator"
-            readonly id: "timestampNow"
-          }
-          readonly onUpdate: {
-            readonly kind: "generator"
-            readonly id: "timestampNow"
           }
         },
       ]
