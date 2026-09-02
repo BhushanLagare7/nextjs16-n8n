@@ -1,8 +1,9 @@
 import Link from "next/link"
 
-import { PlusIcon } from "lucide-react"
+import { PlusIcon, SearchIcon } from "lucide-react"
 
 import { Button } from "./ui/button"
+import { Input } from "./ui/input"
 
 type EntityHeaderProps = {
   title: string
@@ -87,6 +88,79 @@ export function EntityContainer({
           {children}
         </div>
         {pagination}
+      </div>
+    </div>
+  )
+}
+
+interface EntitySearchProps {
+  value: string
+  onChange: (value: string) => void
+  placeholder?: string
+}
+
+/**
+ * Controlled search input with a leading search icon,
+ * used to filter entity lists.
+ */
+export const EntitySearch = ({
+  value,
+  onChange,
+  placeholder = "Search",
+}: EntitySearchProps) => {
+  return (
+    <div className="relative ml-auto">
+      <SearchIcon className="absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground" />
+      <Input
+        aria-label={placeholder}
+        className="max-w-[200px] border-border bg-background pl-8 shadow-none"
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </div>
+  )
+}
+
+interface EntityPaginationProps {
+  page: number
+  totalPages: number
+  onPageChange: (page: number) => void
+  disabled?: boolean
+}
+
+/**
+ * Simple previous/next pagination control with a page indicator.
+ * Buttons are disabled at the first/last page or when `disabled` is true.
+ */
+export const EntityPagination = ({
+  page,
+  totalPages,
+  onPageChange,
+  disabled,
+}: EntityPaginationProps) => {
+  return (
+    <div className="flex w-full items-center justify-between gap-x-2">
+      <div className="flex-1 text-sm text-muted-foreground">
+        Page {page} of {totalPages || 1}
+      </div>
+      <div className="flex items-center justify-end space-x-2 py-4">
+        <Button
+          disabled={page === 1 || disabled}
+          size="sm"
+          variant="outline"
+          onClick={() => onPageChange(Math.max(1, page - 1))}
+        >
+          Previous
+        </Button>
+        <Button
+          disabled={page === totalPages || totalPages === 0 || disabled}
+          size="sm"
+          variant="outline"
+          onClick={() => onPageChange(Math.min(totalPages, page + 1))}
+        >
+          Next
+        </Button>
       </div>
     </div>
   )

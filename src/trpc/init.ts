@@ -48,10 +48,12 @@ export const baseProcedure = t.procedure
  * otherwise attaches the session to context as `auth`.
  */
 export const protectedProcedure = baseProcedure.use(async ({ ctx, next }) => {
-  // Fetch session using incoming request headers
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  })
+  // Fetch session using incoming request headers, or reuse session provided in ctx
+  const session =
+    (ctx as { auth?: typeof auth.$Infer.Session | null }).auth ??
+    (await auth.api.getSession({
+      headers: await headers(),
+    }))
 
   if (!session) {
     throw new TRPCError({ code: "UNAUTHORIZED", message: "Unathorized" })
