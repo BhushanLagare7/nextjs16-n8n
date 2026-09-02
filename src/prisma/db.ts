@@ -9,7 +9,7 @@ import contractJson from "./contract.json" with { type: "json" }
 // contract.json is regenerated with updated schema/codecs.
 const globalForPrisma = globalThis as unknown as {
   prismaDb?: ReturnType<typeof postgres<Contract>>
-  prismaContractJson?: typeof contractJson
+  prismaStorageHash?: string
 }
 
 /**
@@ -18,7 +18,7 @@ const globalForPrisma = globalThis as unknown as {
  */
 export const db =
   globalForPrisma.prismaDb &&
-  globalForPrisma.prismaContractJson === contractJson
+  globalForPrisma.prismaStorageHash === contractJson.storage.storageHash
     ? globalForPrisma.prismaDb
     : (() => {
         const client = postgres<Contract>({
@@ -28,7 +28,7 @@ export const db =
         // Only cache on globalThis outside production to survive hot reloads
         if (process.env.NODE_ENV !== "production") {
           globalForPrisma.prismaDb = client
-          globalForPrisma.prismaContractJson = contractJson
+          globalForPrisma.prismaStorageHash = contractJson.storage.storageHash
         }
         return client
       })()

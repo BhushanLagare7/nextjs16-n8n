@@ -903,10 +903,6 @@
                 },
                 "updatedAt": {
                   "codecId": "pg/timestamptz-string@1",
-                  "default": {
-                    "expression": "now()",
-                    "kind": "function"
-                  },
                   "nativeType": "timestamptz",
                   "nullable": false
                 },
@@ -950,10 +946,10 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "c8d995fe4987431e422295d94464f859c379c00c065a101d9ba3b72cca678c08"
+    "storageHash": "8f5acda65a62422fdb34be3484ee45aabf11397f22a41ac32bbcf9408d75b1cf"
   },
   "execution": {
-    "executionHash": "365f487de9ec2aeb2f30e98633072a2029416865b2f2c99e9a4fdaf2e926fa21",
+    "executionHash": "c06fe060879e23614772049f17ef4db536a790a9a8cb70e65e5c2059f988f09b",
     "mutations": {
       "defaults": [
         {
@@ -963,6 +959,21 @@
           },
           "ref": {
             "column": "id",
+            "namespace": "public",
+            "table": "workflow"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "timestampNow",
+            "kind": "generator"
+          },
+          "onUpdate": {
+            "id": "timestampNow",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "updatedAt",
             "namespace": "public",
             "table": "workflow"
           }

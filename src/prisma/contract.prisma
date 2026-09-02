@@ -64,7 +64,7 @@ model Workflow {
   id        String           @id @default(cuid(2))
   name      String
   createdAt TimestamptzString @default(now())
-  updatedAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
   userId    String
   user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
