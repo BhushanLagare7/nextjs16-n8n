@@ -33,7 +33,7 @@ import type {
 } from "@prisma/orm-postgres/contract/types"
 
 export type StorageHash =
-  StorageHashBase<"c8d995fe4987431e422295d94464f859c379c00c065a101d9ba3b72cca678c08">
+  StorageHashBase<"1a23d59d89a758ba8dd19f0189ac3961893d5505779b9601bff1e0698a54bfbb">
 export type ExecutionHash =
   ExecutionHashBase<"365f487de9ec2aeb2f30e98633072a2029416865b2f2c99e9a4fdaf2e926fa21">
 export type ProfileHash =
@@ -575,8 +575,8 @@ export type FieldOutputTypes = {
     readonly Workflow: {
       readonly id: CodecTypes["pg/text@1"]["output"]
       readonly name: CodecTypes["pg/text@1"]["output"]
-      readonly createdAt: CodecTypes["pg/timestamptz-string@1"]["output"]
-      readonly updatedAt: CodecTypes["pg/timestamptz-string@1"]["output"]
+      readonly createdAt: CodecTypes["pg/timestamptz-temporal@1"]["output"]
+      readonly updatedAt: CodecTypes["pg/timestamptz-temporal@1"]["output"]
       readonly userId: CodecTypes["pg/text@1"]["output"]
     }
   }
@@ -631,8 +631,8 @@ export type FieldInputTypes = {
     readonly Workflow: {
       readonly id: CodecTypes["pg/text@1"]["input"]
       readonly name: CodecTypes["pg/text@1"]["input"]
-      readonly createdAt: CodecTypes["pg/timestamptz-string@1"]["input"]
-      readonly updatedAt: CodecTypes["pg/timestamptz-string@1"]["input"]
+      readonly createdAt: CodecTypes["pg/timestamptz-temporal@1"]["input"]
+      readonly updatedAt: CodecTypes["pg/timestamptz-temporal@1"]["input"]
       readonly userId: CodecTypes["pg/text@1"]["input"]
     }
   }
@@ -683,10 +683,10 @@ export type StorageColumnTypes = {
       readonly value: CodecTypes["pg/text@1"]["output"]
     }
     readonly workflow: {
-      readonly createdAt: CodecTypes["pg/timestamptz-string@1"]["output"]
+      readonly createdAt: CodecTypes["pg/timestamptz-temporal@1"]["output"]
       readonly id: CodecTypes["pg/text@1"]["output"]
       readonly name: CodecTypes["pg/text@1"]["output"]
-      readonly updatedAt: CodecTypes["pg/timestamptz-string@1"]["output"]
+      readonly updatedAt: CodecTypes["pg/timestamptz-temporal@1"]["output"]
       readonly userId: CodecTypes["pg/text@1"]["output"]
     }
   }
@@ -739,10 +739,10 @@ export type StorageColumnInputTypes = {
       readonly value: CodecTypes["pg/text@1"]["input"]
     }
     readonly workflow: {
-      readonly createdAt: CodecTypes["pg/timestamptz-string@1"]["input"]
+      readonly createdAt: CodecTypes["pg/timestamptz-temporal@1"]["input"]
       readonly id: CodecTypes["pg/text@1"]["input"]
       readonly name: CodecTypes["pg/text@1"]["input"]
-      readonly updatedAt: CodecTypes["pg/timestamptz-string@1"]["input"]
+      readonly updatedAt: CodecTypes["pg/timestamptz-temporal@1"]["input"]
       readonly userId: CodecTypes["pg/text@1"]["input"]
     }
   }
@@ -1042,7 +1042,7 @@ type ContractBase = Omit<
                 }
                 readonly createdAt: {
                   readonly nativeType: "timestamptz"
-                  readonly codecId: "pg/timestamptz-string@1"
+                  readonly codecId: "pg/timestamptz-temporal@1"
                   readonly nullable: false
                   readonly default: {
                     readonly kind: "function"
@@ -1051,7 +1051,7 @@ type ContractBase = Omit<
                 }
                 readonly updatedAt: {
                   readonly nativeType: "timestamptz"
-                  readonly codecId: "pg/timestamptz-string@1"
+                  readonly codecId: "pg/timestamptz-temporal@1"
                   readonly nullable: false
                   readonly default: {
                     readonly kind: "function"
@@ -1412,19 +1412,7 @@ type ContractBase = Omit<
                 }
               }
             }
-            readonly relations: {
-              readonly workflows: {
-                readonly to: {
-                  readonly namespace: "public" & NamespaceId
-                  readonly model: "Workflow"
-                }
-                readonly cardinality: "1:N"
-                readonly on: {
-                  readonly localFields: readonly ["id"]
-                  readonly targetFields: readonly ["userId"]
-                }
-              }
-            }
+            readonly relations: Record<string, never>
             readonly storage: {
               readonly table: "user"
               readonly namespaceId: "public"
@@ -1521,14 +1509,14 @@ type ContractBase = Omit<
                 readonly nullable: false
                 readonly type: {
                   readonly kind: "scalar"
-                  readonly codecId: "pg/timestamptz-string@1"
+                  readonly codecId: "pg/timestamptz-temporal@1"
                 }
               }
               readonly updatedAt: {
                 readonly nullable: false
                 readonly type: {
                   readonly kind: "scalar"
-                  readonly codecId: "pg/timestamptz-string@1"
+                  readonly codecId: "pg/timestamptz-temporal@1"
                 }
               }
               readonly userId: {
