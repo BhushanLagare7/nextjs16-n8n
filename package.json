@@ -12,6 +12,7 @@
     "format": "eslint --fix && prettier --write .",
     "format:check": "prettier --check . && eslint",
     "typecheck": "tsc --noEmit",
+    "test": "tsx --test src/**/*.test.ts",
     "contract:emit": "prisma contract emit",
     "inngest:dev": "inngest-cli dev",
     "dev:all": "mprocs"
@@ -70,6 +71,7 @@
     "prettier-plugin-tailwindcss": "^0.8.0",
     "prisma": "^8.0.0-rc.10",
     "tailwindcss": "^4",
+    "tsx": "^4.23.13",
     "typescript": "^5"
   },
   "overrides": {

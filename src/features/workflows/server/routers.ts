@@ -84,9 +84,10 @@ export const workflowsRouter = createTRPCRouter({
   getMany: protectedProcedure
     .input(
       z.object({
-        page: z.number().default(PAGINATION.DEFAULT_PAGE),
+        page: z.number().int().min(1).default(PAGINATION.DEFAULT_PAGE),
         pageSize: z
           .number()
+          .int()
           .min(PAGINATION.MIN_PAGE_SIZE)
           .max(PAGINATION.MAX_PAGE_SIZE)
           .default(PAGINATION.DEFAULT_PAGE_SIZE),

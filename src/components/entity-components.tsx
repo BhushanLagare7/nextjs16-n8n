@@ -112,6 +112,7 @@ export const EntitySearch = ({
     <div className="relative ml-auto">
       <SearchIcon className="absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground" />
       <Input
+        aria-label={placeholder}
         className="max-w-[200px] border-border bg-background pl-8 shadow-none"
         placeholder={placeholder}
         value={value}
