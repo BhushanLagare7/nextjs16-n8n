@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server"
 import { generateSlug } from "random-word-slugs"
 import { z } from "zod"
 
+import { PAGINATION } from "@/config/constants"
 import { db } from "@/prisma/db"
 import {
   createTRPCRouter,
@@ -14,7 +15,7 @@ import {
  * All procedures require authentication and scope results to the current user.
  */
 export const workflowsRouter = createTRPCRouter({
-  /** Creates a new workflow with a randomly generated name */
+  /** Creates a new workflow with a randomly generated name. Requires a premium plan. */
   create: premiumProcedure.mutation(({ ctx }) => {
     return db.orm.public.Workflow.create({
       name: generateSlug(3),
@@ -79,10 +80,57 @@ export const workflowsRouter = createTRPCRouter({
       return workflow
     }),
 
-  /** Fetches all workflows belonging to the current user */
-  getMany: protectedProcedure.query(({ ctx }) => {
-    return db.orm.public.Workflow.where({
-      userId: ctx.auth.user.id,
-    }).all()
-  }),
+  /** Fetches workflows belonging to the current user with pagination and search */
+  getMany: protectedProcedure
+    .input(
+      z.object({
+        page: z.number().default(PAGINATION.DEFAULT_PAGE),
+        pageSize: z
+          .number()
+          .min(PAGINATION.MIN_PAGE_SIZE)
+          .max(PAGINATION.MAX_PAGE_SIZE)
+          .default(PAGINATION.DEFAULT_PAGE_SIZE),
+        search: z.string().default(""),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const { page, pageSize, search } = input
+
+      // Base query: only workflows owned by the current user
+      let query = db.orm.public.Workflow.where((w) =>
+        w.userId.eq(ctx.auth.user.id)
+      )
+
+      // Optional case-insensitive name filter
+      if (search) {
+        query = query.where((w) => w.name.ilike(`%${search}%`))
+      }
+
+      // Run the paginated fetch and total count concurrently
+      const [items, total] = await Promise.all([
+        query
+          .orderBy((w) => w.updatedAt.desc())
+          .offset((page - 1) * pageSize)
+          .limit(pageSize)
+          .all(),
+        query.aggregate((agg) => ({
+          count: agg.count(),
+        })),
+      ])
+
+      const totalCount = total.count
+      const totalPages = Math.ceil(totalCount / pageSize)
+      const hasNextPage = page < totalPages
+      const hasPreviousPage = page > 1
+
+      return {
+        items,
+        page,
+        pageSize,
+        totalCount,
+        totalPages,
+        hasNextPage,
+        hasPreviousPage,
+      }
+    }),
 })
