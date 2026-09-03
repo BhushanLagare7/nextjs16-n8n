@@ -2,17 +2,32 @@
 
 import { useRouter } from "next/navigation"
 
+import { formatDistanceToNow } from "date-fns"
+import { WorkflowIcon } from "lucide-react"
+
 import {
+  EmptyView,
   EntityContainer,
   EntityHeader,
+  EntityItem,
+  EntityList,
   EntityPagination,
   EntitySearch,
+  ErrorView,
+  LoadingView,
 } from "@/components/entity-components"
 import { useEntitySearch } from "@/hooks/use-entity-search"
 import { useUpgradeModal } from "@/hooks/use-upgrade-modal"
+import type { RouterOutputs } from "@/trpc/client"
 
-import { useCreateWorkflow, useSuspenseWorkflows } from "../hooks/use-workflows"
+import {
+  useCreateWorkflow,
+  useRemoveWorkflow,
+  useSuspenseWorkflows,
+} from "../hooks/use-workflows"
 import { useWorkflowsParams } from "../hooks/use-workflows-params"
+
+export type Workflow = RouterOutputs["workflows"]["getMany"]["items"][number]
 
 /**
  * Debounced search input for the workflows list, synced with URL params.
@@ -41,10 +56,12 @@ export function WorkflowsList() {
   const workflows = useSuspenseWorkflows()
 
   return (
-    <div className="flex flex-1 items-center justify-center">
-      {/* TODO: replace raw JSON dump with an actual workflow list UI */}
-      <pre>{JSON.stringify(workflows.data, null, 2)}</pre>
-    </div>
+    <EntityList
+      emptyView={<WorkflowsEmpty />}
+      getKey={(workflow) => workflow.id}
+      items={workflows.data.items}
+      renderItem={(workflow) => <WorkflowItem data={workflow} />}
+    />
   )
 }
 
@@ -120,5 +137,77 @@ export function WorkflowsContainer({
     >
       {children}
     </EntityContainer>
+  )
+}
+
+/** Loading state shown while the workflows query is in flight. */
+export function WorkflowsLoading() {
+  return <LoadingView message="Loading workflows..." />
+}
+
+/** Error state shown when the workflows query fails. */
+export function WorkflowsError() {
+  return <ErrorView message="Error loading workflows" />
+}
+
+/**
+ * Empty state shown when the user has no workflows yet.
+ * Provides a "new workflow" action, same behavior as `WorkflowsHeader`.
+ */
+export function WorkflowsEmpty() {
+  const router = useRouter()
+  const createWorkflow = useCreateWorkflow()
+  const { handleError, modal } = useUpgradeModal()
+
+  const handleCreate = () => {
+    createWorkflow.mutate(undefined, {
+      onError: (error) => {
+        handleError(error)
+      },
+      onSuccess: (data) => {
+        router.push(`/workflows/${data.id}`)
+      },
+    })
+  }
+
+  return (
+    <>
+      {modal}
+      <EmptyView
+        message="You haven't created any workflows yet. Get started by creating your first workflow"
+        title="No Workflows"
+        onNew={handleCreate}
+      />
+    </>
+  )
+}
+
+/** Single row in the workflows list, with delete action via dropdown menu. */
+export function WorkflowItem({ data }: { data: Workflow }) {
+  const removeWorkflow = useRemoveWorkflow()
+
+  const handleRemove = () => {
+    removeWorkflow.mutate({ id: data.id })
+  }
+
+  return (
+    <EntityItem
+      href={`/workflows/${data.id}`}
+      image={
+        <div className="flex size-8 items-center justify-center">
+          <WorkflowIcon className="size-5 text-muted-foreground" />
+        </div>
+      }
+      isRemoving={removeWorkflow.isPending}
+      subtitle={
+        <>
+          Updated {formatDistanceToNow(data.updatedAt, { addSuffix: true })}{" "}
+          &bull; Created{" "}
+          {formatDistanceToNow(data.createdAt, { addSuffix: true })}
+        </>
+      }
+      title={data.name}
+      onRemove={handleRemove}
+    />
   )
 }
