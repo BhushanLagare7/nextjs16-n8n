@@ -51,13 +51,14 @@ export const baseProcedure = t.procedure
 export const protectedProcedure = baseProcedure.use(async ({ ctx, next }) => {
   // Fetch session using incoming request headers, or reuse session provided in ctx
   const session =
-    (ctx as { auth?: typeof auth.$Infer.Session | null }).auth ??
-    (await auth.api.getSession({
-      headers: await headers(),
-    }))
+    "auth" in ctx
+      ? (ctx as { auth?: typeof auth.$Infer.Session | null }).auth
+      : await auth.api.getSession({
+          headers: await headers(),
+        })
 
   if (!session) {
-    throw new TRPCError({ code: "UNAUTHORIZED", message: "Unathorized" })
+    throw new TRPCError({ code: "UNAUTHORIZED", message: "Unauthorized" })
   }
 
   // Pass session down to downstream procedures via context

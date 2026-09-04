@@ -1,8 +1,9 @@
 import { TRPCError } from "@trpc/server"
+import type { Edge, Node } from "@xyflow/react"
 import { generateSlug } from "random-word-slugs"
 import { z } from "zod"
 
-import { PAGINATION } from "@/config/constants"
+import { NodeType, PAGINATION } from "@/config/constants"
 import { db } from "@/prisma/db"
 import {
   createTRPCRouter,
@@ -15,11 +16,23 @@ import {
  * All procedures require authentication and scope results to the current user.
  */
 export const workflowsRouter = createTRPCRouter({
-  /** Creates a new workflow with a randomly generated name. Requires a premium plan. */
-  create: premiumProcedure.mutation(({ ctx }) => {
-    return db.orm.public.Workflow.create({
-      name: generateSlug(3),
-      userId: ctx.auth.user.id,
+  /** Creates a new workflow with an initial node. Requires a premium plan. */
+  create: premiumProcedure.mutation(async ({ ctx }) => {
+    // Transaction so a workflow is never left without its initial node
+    return db.transaction(async (tx) => {
+      const workflow = await tx.orm.public.Workflow.create({
+        name: generateSlug(3), // e.g. "brave-quiet-otter"
+        userId: ctx.auth.user.id,
+      })
+
+      await tx.orm.public.Node.create({
+        workflowId: workflow.id,
+        name: NodeType.INITIAL,
+        type: NodeType.INITIAL,
+        position: { x: 0, y: 0 },
+      })
+
+      return workflow
     })
   }),
 
@@ -32,6 +45,7 @@ export const workflowsRouter = createTRPCRouter({
         userId: ctx.auth.user.id,
       }).delete()
 
+      // Also covers workflows that exist but belong to another user
       if (!workflow) {
         throw new TRPCError({
           code: "NOT_FOUND",
@@ -61,14 +75,22 @@ export const workflowsRouter = createTRPCRouter({
       return workflow
     }),
 
-  /** Fetches a single workflow by id, scoped to the current user */
+  /** Fetches a single workflow by id, scoped to the current user with react-flow compatible nodes and edges */
   getOne: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
       const workflow = await db.orm.public.Workflow.where({
         id: input.id,
         userId: ctx.auth.user.id,
-      }).first()
+      })
+        // Select only the fields the canvas needs
+        .include("nodes", (node) =>
+          node.select("id", "type", "position", "data")
+        )
+        .include("connections", (conn) =>
+          conn.select("id", "fromNodeId", "toNodeId", "fromOutput", "toInput")
+        )
+        .first()
 
       if (!workflow) {
         throw new TRPCError({
@@ -77,7 +99,29 @@ export const workflowsRouter = createTRPCRouter({
         })
       }
 
-      return workflow
+      // Transform server nodes to react-flow compatible nodes
+      const nodes: Node[] = workflow.nodes.map((node) => ({
+        id: node.id,
+        type: node.type,
+        position: node.position as { x: number; y: number }, // stored as JSON
+        data: (node.data as Record<string, unknown>) || {},
+      }))
+
+      // Transform server connections to react-flow compatible edges
+      const edges: Edge[] = workflow.connections.map((connection) => ({
+        id: connection.id,
+        source: connection.fromNodeId,
+        target: connection.toNodeId,
+        sourceHandle: connection.fromOutput,
+        targetHandle: connection.toInput,
+      }))
+
+      return {
+        id: workflow.id,
+        name: workflow.name,
+        nodes,
+        edges,
+      }
     }),
 
   /** Fetches workflows belonging to the current user with pagination and search */
@@ -110,7 +154,7 @@ export const workflowsRouter = createTRPCRouter({
       // Run the paginated fetch and total count concurrently
       const [items, total] = await Promise.all([
         query
-          .orderBy((w) => w.updatedAt.desc())
+          .orderBy((w) => w.updatedAt.desc()) // most recently edited first
           .offset((page - 1) * pageSize)
           .limit(pageSize)
           .all(),
@@ -119,6 +163,7 @@ export const workflowsRouter = createTRPCRouter({
         })),
       ])
 
+      // Derive pagination metadata for the client
       const totalCount = total.count
       const totalPages = Math.ceil(totalCount / pageSize)
       const hasNextPage = page < totalPages
