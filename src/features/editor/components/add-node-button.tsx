@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 export const AddNodeButton = memo(() => {
   return (
     <Button
+      aria-label="Add node"
       className="bg-background"
       size="icon"
       variant="outline"

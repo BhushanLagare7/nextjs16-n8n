@@ -67,12 +67,20 @@ export const PlaceholderNode = forwardRef<HTMLDivElement, PlaceholderNodeProps>(
     return (
       <BaseNode
         ref={ref}
+        aria-label="Add a new node"
         className={cn(
           "h-auto w-auto cursor-pointer border-dashed border-muted-foreground/30 bg-card p-4 text-center text-muted-foreground shadow-none transition-colors hover:border-muted-foreground hover:bg-muted/50 hover:text-foreground",
           // "min-w-[150px]", // For now we use auto width
           className
         )}
+        role="button"
         onClick={handleClick}
+        onKeyDown={(e: React.KeyboardEvent<HTMLDivElement>) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault()
+            handleClick(e as unknown as React.MouseEvent<HTMLDivElement>)
+          }
+        }}
       >
         {children}
 
