@@ -35,10 +35,20 @@ export function WorkflowNode({
       {/* Action toolbar — only visible while the node is selected */}
       {showToolbar && (
         <NodeToolbar>
-          <Button aria-label="Open node settings" size="sm" variant="ghost" onClick={onSettings}>
+          <Button
+            aria-label="Open node settings"
+            size="sm"
+            variant="ghost"
+            onClick={onSettings}
+          >
             <SettingsIcon className="size-4" />
           </Button>
-          <Button aria-label="Delete node" size="sm" variant="ghost" onClick={onDelete}>
+          <Button
+            aria-label="Delete node"
+            size="sm"
+            variant="ghost"
+            onClick={onDelete}
+          >
             <TrashIcon className="size-4" />
           </Button>
         </NodeToolbar>
