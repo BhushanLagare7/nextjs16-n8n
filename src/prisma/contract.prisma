@@ -1,70 +1,432 @@
 // use prisma-next
+
+// ============================================================
+// AUTH MODELS
+// These models power authentication (e.g., better-auth style)
+// including users, sessions, OAuth accounts, and verification
+// tokens.
+// ============================================================
+
+/// Represents an application user.
+/// Central entity that owns sessions, linked accounts (OAuth/credentials),
+/// workflows, and stored API credentials.
 model User {
+  /// Unique identifier for the user.
   id            String               @id
+
+  /// Display name of the user.
   name          String
+
+  /// User's email address. Must be unique across all users.
   email         String               @unique
+
+  /// Whether the user's email has been verified.
   emailVerified Boolean
+
+  /// Optional profile picture / avatar URL.
   image         String?
+
+  /// Timestamp when the user record was created.
   createdAt     TimestamptzString(3)
+
+  /// Timestamp when the user record was last updated.
   updatedAt     TimestamptzString(3)
+
+  /// All active/inactive sessions belonging to this user.
+  sessions      Session[]
+
+  /// OAuth or credential-based accounts linked to this user.
+  accounts      Account[]
+
+  /// Workflows created and owned by this user.
   workflows     Workflow[]
 
+  /// API credentials (e.g., OpenAI, Anthropic keys) stored by this user.
+  credentials   Credential[]
+
+  /// Maps this model to the "user" table in the database.
   @@map("user")
 }
 
+/// Represents an active login session for a user.
+/// Used to validate authenticated requests via session tokens.
 model Session {
+  /// Unique identifier for the session.
   id        String               @id
-  user      User                 @relation(fields:[userId], references:[id])
+
+  /// The user this session belongs to.
+  user      User                 @relation(fields: [userId], references: [id])
+
+  /// Foreign key referencing the owning user's id.
   userId    String
+
+  /// Unique session token used for authentication (e.g., stored in cookies).
   token     String               @unique
+
+  /// Timestamp indicating when this session expires.
   expiresAt TimestamptzString(3)
+
+  /// IP address from which the session was created (for auditing/security).
   ipAddress String?
+
+  /// User agent string of the client that created the session.
   userAgent String?
+
+  /// Timestamp when the session was created.
   createdAt TimestamptzString(3)
+
+  /// Timestamp when the session was last updated.
   updatedAt TimestamptzString(3)
 
+  /// Index to speed up lookups of sessions by user.
   @@index([userId], map: "session_userId_idx")
+
+  /// Maps this model to the "session" table in the database.
   @@map("session")
 }
 
+/// Represents a linked external account (OAuth provider or credentials-based login).
+/// A single user can have multiple linked accounts (e.g., Google, GitHub, email/password).
 model Account {
+  /// Unique identifier for the account link.
   id                    String                @id
-  user                  User                  @relation(fields:[userId], references:[id])
+
+  /// The user this account is linked to.
+  user                  User                  @relation(fields: [userId], references: [id])
+
+  /// Foreign key referencing the owning user's id.
   userId                String
+
+  /// The issuer of the account (e.g., domain or platform issuing identity).
   issuer                String
+
+  /// The unique account ID as provided by the external provider.
   accountId             String
+
+  /// Identifier of the authentication provider (e.g., "google", "github", "credentials").
   providerId            String
+
+  /// OAuth access token, if applicable.
   accessToken           String?
+
+  /// OAuth refresh token, if applicable.
   refreshToken          String?
+
+  /// Expiration timestamp for the access token.
   accessTokenExpiresAt  TimestamptzString(3)?
+
+  /// Expiration timestamp for the refresh token.
   refreshTokenExpiresAt TimestamptzString(3)?
+
+  /// OAuth scopes granted for this account.
   scope                 String?
+
+  /// OAuth ID token (used in OpenID Connect flows).
   idToken               String?
+
+  /// Hashed password, used only for credential-based (email/password) accounts.
   password              String?
+
+  /// Timestamp when this account link was created.
   createdAt             TimestamptzString(3)
+
+  /// Timestamp when this account link was last updated.
   updatedAt             TimestamptzString(3)
 
+  /// Index to speed up lookups of accounts by user.
   @@index([userId], map: "account_userId_idx")
+
+  /// Maps this model to the "account" table in the database.
   @@map("account")
 }
 
+/// Represents a verification record used for flows like
+/// email verification, password reset, or magic link login.
 model Verification {
+  /// Unique identifier for the verification record.
   id         String               @id
+
+  /// The identifier being verified (e.g., email address).
   identifier String
+
+  /// The verification value/token (e.g., OTP code or verification token).
   value      String
+
+  /// Timestamp indicating when this verification record expires.
   expiresAt  TimestamptzString(3)
+
+  /// Timestamp when the verification record was created.
   createdAt  TimestamptzString(3)
+
+  /// Timestamp when the verification record was last updated.
   updatedAt  TimestamptzString(3)
 
+  /// Index to speed up lookups by identifier (e.g., email).
   @@index([identifier], map: "verification_identifier_idx")
+
+  /// Maps this model to the "verification" table in the database.
   @@map("verification")
 }
 
-model Workflow {
-  id        String           @id @default(cuid(2))
+// ============================================================
+// CREDENTIAL MODELS
+// Stores API credentials/keys used by workflow nodes to
+// authenticate with third-party AI providers.
+// ============================================================
+
+/// Enumerates supported third-party AI credential providers.
+enum CredentialType {
+  /// Stored as plain text in Postgres.
+  @@type("pg/text@1")
+
+  /// Credential for OpenAI API.
+  OPENAI = "OPENAI"
+
+  /// Credential for Anthropic API.
+  ANTHROPIC = "ANTHROPIC"
+
+  /// Credential for Google Gemini API.
+  GEMINI = "GEMINI"
+}
+
+/// Represents a stored API credential (e.g., API key) owned by a user,
+/// which can be attached to one or more workflow nodes.
+model Credential {
+  /// Unique identifier for the credential, auto-generated using cuid v2.
+  id        String                     @id @default(cuid(2))
+
+  /// Human-readable name for the credential (e.g., "My OpenAI Key").
   name      String
-  createdAt TimestamptzString @default(now())
+
+  /// The actual secret/API key value.
+  value     String
+
+  /// The provider type this credential is used for.
+  type      CredentialType
+
+  /// Timestamp when the credential was created. Defaults to current time.
+  createdAt TimestamptzString          @default(now())
+
+  /// Timestamp automatically updated whenever the credential record changes.
   updatedAt temporal.updatedAtString()
+
+  /// Foreign key referencing the owning user.
   userId    String
-  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// The user who owns this credential. Deleting the user cascades to delete the credential.
+  user      User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Nodes that use this credential to authenticate with external services.
+  nodes     Node[]
+}
+
+// ============================================================
+// WORKFLOW MODELS
+// Core domain models representing automation workflows,
+// composed of nodes connected together, and their execution history.
+// ============================================================
+
+/// Represents a user-created automation workflow,
+/// composed of nodes and connections between them.
+model Workflow {
+  /// Unique identifier for the workflow, auto-generated using cuid v2.
+  id          String                     @id @default(cuid(2))
+
+  /// Human-readable name of the workflow.
+  name        String
+
+  /// Timestamp when the workflow was created. Defaults to current time.
+  createdAt   TimestamptzString          @default(now())
+
+  /// Timestamp automatically updated whenever the workflow record changes.
+  updatedAt   temporal.updatedAtString()
+
+  /// All nodes that belong to this workflow.
+  nodes       Node[]
+
+  /// All connections (edges) between nodes in this workflow.
+  connections Connection[]
+
+  /// History of executions of this workflow.
+  executions  Execution[]
+
+  /// Foreign key referencing the owning user.
+  userId      String
+
+  /// The user who owns this workflow. Deleting the user cascades to delete the workflow.
+  user        User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// Enumerates the supported types of workflow nodes.
+enum NodeType {
+  /// Stored as plain text in Postgres.
+  @@type("pg/text@1")
+
+  /// Placeholder/initial node type (default starting point).
+  INITIAL = "INITIAL"
+
+  /// Node manually triggered by the user to start a workflow.
+  MANUAL_TRIGGER = "MANUAL_TRIGGER"
+
+  /// Node that performs an outbound HTTP request.
+  HTTP_REQUEST = "HTTP_REQUEST"
+
+  /// Node triggered by a Google Form submission.
+  GOOGLE_FORM_TRIGGER = "GOOGLE_FORM_TRIGGER"
+
+  /// Node triggered by a Stripe event/webhook.
+  STRIPE_TRIGGER = "STRIPE_TRIGGER"
+
+  /// Node that calls the Anthropic AI API.
+  ANTHROPIC = "ANTHROPIC"
+
+  /// Node that calls the Google Gemini AI API.
+  GEMINI = "GEMINI"
+
+  /// Node that calls the OpenAI API.
+  OPENAI = "OPENAI"
+
+  /// Node that sends messages/notifications to Discord.
+  DISCORD = "DISCORD"
+
+  /// Node that sends messages/notifications to Slack.
+  SLACK = "SLACK"
+}
+
+/// Represents a single node (step/action) within a workflow.
+/// Nodes are connected to each other via Connection records to
+/// form the overall automation graph.
+model Node {
+  /// Unique identifier for the node, auto-generated using cuid v2.
+  id                String                     @id @default(cuid(2))
+
+  /// Foreign key referencing the parent workflow.
+  workflowId        String
+
+  /// The workflow this node belongs to. Deleting the workflow cascades to delete the node.
+  workflow          Workflow                   @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  /// Human-readable name for the node.
+  name              String
+
+  /// The type of action/behavior this node performs.
+  type              NodeType
+
+  /// Position of the node on the visual workflow canvas (e.g., { x, y }).
+  position          Jsonb
+
+  /// Arbitrary configuration/data specific to the node type (e.g., request payload, prompt).
+  data              Jsonb                      @default("{}")
+
+  /// Optional foreign key referencing a credential used by this node.
+  credentialId      String?
+
+  /// The credential (API key) this node uses to authenticate, if applicable.
+  credential        Credential?                @relation(fields: [credentialId], references: [id])
+
+  /// Connections originating FROM this node (outgoing edges).
+  outputConnections Connection[]               @relation("FromNode")
+
+  /// Connections pointing TO this node (incoming edges).
+  inputConnections  Connection[]               @relation("ToNode")
+
+  /// Timestamp when the node was created. Defaults to current time.
+  createdAt         TimestamptzString          @default(now())
+
+  /// Timestamp automatically updated whenever the node record changes.
+  updatedAt         temporal.updatedAtString()
+}
+
+/// Represents a directed connection (edge) between two nodes in a workflow,
+/// defining the flow of data/execution from one node's output to another's input.
+model Connection {
+  /// Unique identifier for the connection, auto-generated using cuid v2.
+  id         String                     @id @default(cuid(2))
+
+  /// Foreign key referencing the parent workflow.
+  workflowId String
+
+  /// The workflow this connection belongs to. Deleting the workflow cascades to delete the connection.
+  workflow   Workflow                   @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  /// Foreign key referencing the source node.
+  fromNodeId String
+
+  /// The node this connection originates from. Deleting the node cascades to delete the connection.
+  fromNode   Node                       @relation("FromNode", fields: [fromNodeId], references: [id], onDelete: Cascade)
+
+  /// Foreign key referencing the destination node.
+  toNodeId   String
+
+  /// The node this connection points to. Deleting the node cascades to delete the connection.
+  toNode     Node                       @relation("ToNode", fields: [toNodeId], references: [id], onDelete: Cascade)
+
+  /// Name of the output port on the source node (defaults to "main").
+  fromOutput String                     @default("main")
+
+  /// Name of the input port on the destination node (defaults to "main").
+  toInput    String                     @default("main")
+
+  /// Timestamp when the connection was created. Defaults to current time.
+  createdAt  TimestamptzString          @default(now())
+
+  /// Timestamp automatically updated whenever the connection record changes.
+  updatedAt  temporal.updatedAtString()
+
+  /// Ensures no duplicate connections exist between the same output/input pair of two nodes.
+  @@unique([fromNodeId, toNodeId, fromOutput, toInput])
+}
+
+// ============================================================
+// EXECUTION MODELS
+// Tracks runtime execution history and status of workflows.
+// ============================================================
+
+/// Enumerates possible statuses of a workflow execution.
+enum ExecutionStatus {
+  /// Stored as plain text in Postgres.
+  @@type("pg/text@1")
+
+  /// Execution is currently in progress.
+  RUNNING = "RUNNING"
+
+  /// Execution completed successfully.
+  SUCCESS = "SUCCESS"
+
+  /// Execution failed with an error.
+  FAILED = "FAILED"
+}
+
+/// Represents a single execution/run instance of a workflow,
+/// capturing its status, timing, output, and any errors encountered.
+model Execution {
+  /// Unique identifier for the execution, auto-generated using cuid v2.
+  id             String             @id @default(cuid(2))
+
+  /// Foreign key referencing the workflow being executed.
+  workflowId     String
+
+  /// The workflow this execution belongs to. Deleting the workflow cascades to delete the execution.
+  workflow       Workflow           @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  /// Current status of the execution. Defaults to RUNNING.
+  status         ExecutionStatus    @default(RUNNING)
+
+  /// Human-readable error message, if the execution failed.
+  error          String?
+
+  /// Full error stack trace, if the execution failed (for debugging).
+  errorStack     String?
+
+  /// Timestamp when the execution started. Defaults to current time.
+  startedAt      TimestamptzString  @default(now())
+
+  /// Timestamp when the execution completed (success or failure). Null while running.
+  completedAt    TimestamptzString?
+
+  /// Unique event ID from Inngest, used to correlate this execution with the triggering event.
+  inngestEventId String             @unique
+
+  /// Final output/result data produced by the workflow execution, if any.
+  output         Jsonb?
 }
