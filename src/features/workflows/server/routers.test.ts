@@ -330,6 +330,195 @@ describe("workflowsRouter.updateName", () => {
 })
 
 // ---------------------------------------------------------------------------
+// update
+// ---------------------------------------------------------------------------
+
+describe("workflowsRouter.update", () => {
+  it("rejects unauthenticated caller with UNAUTHORIZED", async () => {
+    await assert.rejects(
+      unauthenticatedCaller.update({ id: "test-id", nodes: [], edges: [] }),
+      expectTRPCError("UNAUTHORIZED")
+    )
+  })
+
+  it("rejects missing id with BAD_REQUEST", async () => {
+    await assert.rejects(
+      // @ts-expect-error testing invalid input type
+      caller.update({ nodes: [], edges: [] }),
+      expectTRPCError("BAD_REQUEST")
+    )
+  })
+
+  it("rejects non-string id with BAD_REQUEST", async () => {
+    await assert.rejects(
+      // @ts-expect-error testing invalid input type
+      caller.update({ id: 123, nodes: [], edges: [] }),
+      expectTRPCError("BAD_REQUEST")
+    )
+  })
+
+  it("rejects invalid nodes input with BAD_REQUEST", async () => {
+    await assert.rejects(
+      // @ts-expect-error testing invalid input type
+      caller.update({ id: "test-id", nodes: "invalid", edges: [] }),
+      expectTRPCError("BAD_REQUEST")
+    )
+  })
+
+  it("rejects invalid edges input with BAD_REQUEST", async () => {
+    await assert.rejects(
+      // @ts-expect-error testing invalid input type
+      caller.update({ id: "test-id", nodes: [], edges: "invalid" }),
+      expectTRPCError("BAD_REQUEST")
+    )
+  })
+
+  it("throws NOT_FOUND when workflow does not exist or does not belong to user", async (t) => {
+    mockWorkflowWhere(t, { first: async () => null })
+
+    await assert.rejects(
+      caller.update({ id: "missing-id", nodes: [], edges: [] }),
+      expectTRPCError("NOT_FOUND", WORKFLOW_NOT_FOUND_MESSAGE)
+    )
+  })
+
+  it("deletes old nodes, creates new nodes and connections, touches updatedAt and returns workflow", async (t) => {
+    const existingWorkflow = {
+      id: "wf-1",
+      name: "Existing Workflow",
+      userId: TEST_USER_ID,
+      ...timestamps(),
+    }
+
+    mockWorkflowWhere(t, { first: async () => existingWorkflow })
+
+    const deleteNodesMock = t.mock.fn(async () => [])
+    const createNodesMock = t.mock.fn(async (data: unknown[]) => data)
+    const createConnectionsMock = t.mock.fn(async (data: unknown[]) => data)
+    const updateWorkflowMock = t.mock.fn(
+      async (data: Record<string, unknown>) => ({
+        ...existingWorkflow,
+        ...data,
+      })
+    )
+
+    const fakeTx = {
+      orm: {
+        public: {
+          Node: {
+            where: t.mock.fn((filter: Record<string, unknown>) => {
+              void filter
+              return { deleteAll: deleteNodesMock }
+            }),
+            createAll: createNodesMock,
+          },
+          Connection: {
+            createAll: createConnectionsMock,
+          },
+          Workflow: {
+            where: t.mock.fn((filter: Record<string, unknown>) => {
+              void filter
+              return { update: updateWorkflowMock }
+            }),
+          },
+        },
+      },
+    }
+
+    t.mock.method(
+      db,
+      "transaction",
+      async (cb: (tx: typeof fakeTx) => Promise<unknown>) => cb(fakeTx)
+    )
+
+    const nodesInput = [
+      {
+        id: "node-1",
+        type: "INITIAL",
+        position: { x: 10, y: 20 },
+        data: { label: "Start" },
+      },
+      {
+        id: "node-2",
+        type: null,
+        position: { x: 30, y: 40 },
+      },
+    ]
+
+    const edgesInput = [
+      {
+        source: "node-1",
+        target: "node-2",
+        sourceHandle: "source-h",
+        targetHandle: "target-h",
+      },
+      {
+        source: "node-1",
+        target: "node-2",
+      },
+    ]
+
+    const result = await caller.update({
+      id: "wf-1",
+      nodes: nodesInput,
+      edges: edgesInput,
+    })
+
+    assert.deepStrictEqual(result, existingWorkflow)
+
+    // Verify node deletion
+    assert.strictEqual(deleteNodesMock.mock.calls.length, 1)
+
+    // Verify nodes created
+    assert.strictEqual(createNodesMock.mock.calls.length, 1)
+    assert.deepStrictEqual(createNodesMock.mock.calls[0]?.arguments[0], [
+      {
+        id: "node-1",
+        workflowId: "wf-1",
+        name: "INITIAL",
+        type: NodeType.INITIAL,
+        position: { x: 10, y: 20 },
+        data: { label: "Start" },
+      },
+      {
+        id: "node-2",
+        workflowId: "wf-1",
+        name: "unknown",
+        type: NodeType.INITIAL,
+        position: { x: 30, y: 40 },
+        data: {},
+      },
+    ])
+
+    // Verify connections created
+    assert.strictEqual(createConnectionsMock.mock.calls.length, 1)
+    assert.deepStrictEqual(createConnectionsMock.mock.calls[0]?.arguments[0], [
+      {
+        workflowId: "wf-1",
+        fromNodeId: "node-1",
+        toNodeId: "node-2",
+        fromOutput: "source-h",
+        toInput: "target-h",
+      },
+      {
+        workflowId: "wf-1",
+        fromNodeId: "node-1",
+        toNodeId: "node-2",
+        fromOutput: "main",
+        toInput: "main",
+      },
+    ])
+
+    // Verify workflow updatedAt update
+    assert.strictEqual(updateWorkflowMock.mock.calls.length, 1)
+    const updateArg = updateWorkflowMock.mock.calls[0]?.arguments[0] as {
+      updatedAt?: string
+    }
+    assert(typeof updateArg?.updatedAt === "string")
+  })
+})
+
+// ---------------------------------------------------------------------------
 // getOne
 // ---------------------------------------------------------------------------
 

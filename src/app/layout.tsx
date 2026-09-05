@@ -3,6 +3,7 @@ import "./globals.css"
 import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 
+import { Provider } from "jotai"
 import { NuqsAdapter } from "nuqs/adapters/next/app"
 
 import { ThemeProvider } from "@/components/theme-provider"
@@ -33,7 +34,13 @@ const fontMono = Geist_Mono({
  * Root application layout. Sets up fonts, providers, and global UI elements.
  *
  * Provider order (outer -> inner):
- * ThemeProvider -> TooltipProvider -> TRPCReactProvider -> NuqsAdapter -> children
+ * ThemeProvider -> TooltipProvider -> TRPCReactProvider -> NuqsAdapter -> Jotai Provider -> children
+ *
+ * - ThemeProvider: light/dark/system theme handling
+ * - TooltipProvider: shadcn/ui tooltip context (single instance for app)
+ * - TRPCReactProvider: tRPC + React Query client
+ * - NuqsAdapter: URL-synced state (query params)
+ * - Jotai Provider: atom-based global state
  */
 export default function RootLayout({
   children,
@@ -57,7 +64,9 @@ export default function RootLayout({
           <TooltipProvider>
             <TRPCReactProvider>
               {/* Enables type-safe URL query state management via nuqs */}
-              <NuqsAdapter>{children}</NuqsAdapter>
+              <NuqsAdapter>
+                <Provider>{children}</Provider>
+              </NuqsAdapter>
             </TRPCReactProvider>
             {/* Global toast notifications, rendered outside TRPC/nuqs scope */}
             <Toaster />

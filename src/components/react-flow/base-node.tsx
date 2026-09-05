@@ -1,28 +1,48 @@
 import { type ComponentProps, forwardRef } from "react"
 
+import { CheckCircle2Icon, Loader2Icon, XCircleIcon } from "lucide-react"
+
 import { cn } from "@/lib/utils"
+
+import { type NodeStatus } from "./node-status-indicator"
+
+interface BaseNodeProps extends ComponentProps<"div"> {
+  /** Current execution status; drives the corner status icon */
+  status?: NodeStatus
+}
 
 /**
  * Root container for custom workflow nodes.
  * Provides card styling, hover ring, and selected states driven by React Flow wrapper classes.
+ *
+ * A tiny status icon is rendered in the bottom-right corner based on `status`.
  */
-export const BaseNode = forwardRef<HTMLDivElement, ComponentProps<"div">>(
-  ({ className, ...props }, ref) => (
+export const BaseNode = forwardRef<HTMLDivElement, BaseNodeProps>(
+  ({ className, status, ...props }, ref) => (
     <div
       ref={ref}
       className={cn(
-        "relative rounded-md border bg-card text-card-foreground",
-        "hover:ring-1",
-        // React Flow displays node elements inside a wrapper with `.react-flow__node`.
-        // When selected, `.selected` is added to that element.
-        // We support Tailwind v4 `in-[.selected]` and the ancestor selector fallback.
+        "relative rounded-sm border border-muted-foreground bg-card text-card-foreground hover:bg-accent",
+        // Selected styles: applied by React Flow adding `.selected` to the ancestor node wrapper
         "in-[.selected]:border-muted-foreground in-[.selected]:shadow-lg",
         "[.react-flow\\_\\_node.selected_&]:border-muted-foreground [.react-flow\\_\\_node.selected_&]:shadow-lg",
         className
       )}
       tabIndex={0}
       {...props}
-    />
+    >
+      {props.children}
+      {/* Status indicator icons rendered as small badges in the bottom-right */}
+      {status === "error" && (
+        <XCircleIcon className="absolute right-0.5 bottom-0.5 size-2 stroke-3 text-red-600 dark:text-red-400" />
+      )}
+      {status === "success" && (
+        <CheckCircle2Icon className="absolute right-0.5 bottom-0.5 size-2 stroke-3 text-emerald-600 dark:text-emerald-400" />
+      )}
+      {status === "loading" && (
+        <Loader2Icon className="absolute -right-0.5 -bottom-0.5 size-2 animate-spin stroke-3 text-blue-600 dark:text-blue-400" />
+      )}
+    </div>
   )
 )
 BaseNode.displayName = "BaseNode"

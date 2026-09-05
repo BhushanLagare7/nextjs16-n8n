@@ -10,7 +10,8 @@ import { useTRPC } from "@/trpc/client"
 import { useWorkflowsParams } from "./use-workflows-params"
 
 /**
- * Hook to fetch all workflows using suspense
+ * Hook to fetch all workflows using suspense.
+ * Pagination/search parameters are read from the URL via `useWorkflowsParams`.
  */
 export function useSuspenseWorkflows() {
   const trpc = useTRPC()
@@ -65,7 +66,7 @@ export function useRemoveWorkflow() {
 }
 
 /**
- * Hook to fetch a single workflow using suspense
+ * Hook to fetch a single workflow using suspense.
  */
 export function useSuspenseWorkflow(id: string) {
   const trpc = useTRPC()
@@ -94,6 +95,30 @@ export function useUpdateWorkflowName() {
       },
       onError: (error) => {
         toast.error(`Failed to update workflow: ${error.message}`)
+      },
+    })
+  )
+}
+
+/**
+ * Hook to update a workflow's nodes and edges (canvas save).
+ * Shows toast feedback and invalidates related caches on success/error.
+ */
+export const useUpdateWorkflow = () => {
+  const queryClient = useQueryClient()
+  const trpc = useTRPC()
+
+  return useMutation(
+    trpc.workflows.update.mutationOptions({
+      onSuccess: (data) => {
+        toast.success(`Workflow "${data.name}" saved`)
+        queryClient.invalidateQueries(trpc.workflows.getMany.queryOptions({}))
+        queryClient.invalidateQueries(
+          trpc.workflows.getOne.queryOptions({ id: data.id })
+        )
+      },
+      onError: (error) => {
+        toast.error(`Failed to save workflow: ${error.message}`)
       },
     })
   )
