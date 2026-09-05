@@ -3,11 +3,15 @@
 import { memo, type ReactNode } from "react"
 import Image from "next/image"
 
-import { type NodeProps, Position } from "@xyflow/react"
+import { type NodeProps, Position, useReactFlow } from "@xyflow/react"
 import type { LucideIcon } from "lucide-react"
 
 import { BaseHandle } from "@/components/react-flow/base-handle"
 import { BaseNode, BaseNodeContent } from "@/components/react-flow/base-node"
+import {
+  type NodeStatus,
+  NodeStatusIndicator,
+} from "@/components/react-flow/node-status-indicator"
 import { WorkflowNode } from "@/components/workflow-node"
 
 interface BaseTriggerNodeProps extends NodeProps {
@@ -16,14 +20,15 @@ interface BaseTriggerNodeProps extends NodeProps {
   name: string
   description?: string
   children?: ReactNode
-  // status?: NodeStatus;
+  status?: NodeStatus
   onSettings?: () => void
   onDoubleClick?: () => void
 }
 
 /**
  * Shared shell for trigger nodes.
- * Has only a source (right) handle since triggers start a workflow.
+ * Has only a source (right) handle since triggers start a workflow —
+ * there is no upstream input to accept.
  */
 export const BaseTriggerNode = memo(
   ({
@@ -32,11 +37,26 @@ export const BaseTriggerNode = memo(
     name,
     description,
     children,
+    status = "initial",
     onSettings,
     onDoubleClick,
   }: BaseTriggerNodeProps) => {
-    // TODO: add delete method
-    const handleDelete = () => {}
+    const { setNodes, setEdges } = useReactFlow()
+
+    /** Remove this node and any edges connected to it */
+    const handleDelete = () => {
+      setNodes((currentNodes) => {
+        const updatedNodes = currentNodes.filter((node) => node.id !== id)
+        return updatedNodes
+      })
+
+      setEdges((currentEdges) => {
+        const updatedEdges = currentEdges.filter(
+          (edge) => edge.source !== id && edge.target !== id
+        )
+        return updatedEdges
+      })
+    }
 
     return (
       <WorkflowNode
@@ -45,22 +65,33 @@ export const BaseTriggerNode = memo(
         onDelete={handleDelete}
         onSettings={onSettings}
       >
-        {/* TODO: Wrap within NodeStatusIndicator */}
         {/* Rounded left edge visually distinguishes triggers from actions */}
-        <BaseNode
-          className="group relative rounded-l-2xl"
-          onDoubleClick={onDoubleClick}
+        <NodeStatusIndicator
+          className="rounded-l-2xl"
+          status={status}
+          variant="border"
         >
-          <BaseNodeContent>
-            {typeof Icon === "string" ? (
-              <Image alt={name} height={16} src={Icon} width={16} />
-            ) : (
-              <Icon className="size-4 text-muted-foreground" />
-            )}
-            {children}
-            <BaseHandle id="source-1" position={Position.Right} type="source" />
-          </BaseNodeContent>
-        </BaseNode>
+          <BaseNode
+            className="group relative rounded-l-2xl"
+            status={status}
+            onDoubleClick={onDoubleClick}
+          >
+            <BaseNodeContent>
+              {typeof Icon === "string" ? (
+                <Image alt={name} height={16} src={Icon} width={16} />
+              ) : (
+                <Icon className="size-4 text-muted-foreground" />
+              )}
+              {children}
+              {/* Output-only handle: triggers are always the graph's starting point */}
+              <BaseHandle
+                id="source-1"
+                position={Position.Right}
+                type="source"
+              />
+            </BaseNodeContent>
+          </BaseNode>
+        </NodeStatusIndicator>
       </WorkflowNode>
     )
   }

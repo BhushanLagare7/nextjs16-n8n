@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 
+import { useAtomValue } from "jotai"
 import { SaveIcon } from "lucide-react"
 
 import {
@@ -17,23 +18,38 @@ import { Input } from "@/components/ui/input"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import {
   useSuspenseWorkflow,
+  useUpdateWorkflow,
   useUpdateWorkflowName,
 } from "@/features/workflows/hooks/use-workflows"
 
+import { editorAtom } from "../store/atoms"
+
 /**
  * Save button for the editor.
- * NOTE: currently a stub — always enabled, no-op on click.
+ * Pulls current nodes/edges from the shared React Flow instance and persists them.
  */
 export function EditorSaveButton({ workflowId }: { workflowId: string }) {
+  // React Flow instance is stored in an atom so any component can read it
+  const editor = useAtomValue(editorAtom)
+  const saveWorkflow = useUpdateWorkflow()
+
+  const handleSave = () => {
+    // Bail early if the editor isn't mounted yet
+    if (!editor) return
+
+    const nodes = editor.getNodes()
+    const edges = editor.getEdges()
+
+    saveWorkflow.mutate({
+      id: workflowId,
+      nodes,
+      edges,
+    })
+  }
+
   return (
     <div className="ml-auto">
-      <Button
-        disabled={false}
-        size="sm"
-        onClick={() => {
-          void workflowId
-        }}
-      >
+      <Button disabled={saveWorkflow.isPending} size="sm" onClick={handleSave}>
         <SaveIcon className="size-4" />
         Save
       </Button>
@@ -82,6 +98,7 @@ export function EditorNameInput({ workflowId }: { workflowId: string }) {
     }
   }
 
+  // Keyboard shortcuts: Enter = save, Escape = cancel
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
       handleSave()
@@ -111,6 +128,7 @@ export function EditorNameInput({ workflowId }: { workflowId: string }) {
     <BreadcrumbItem
       className="cursor-pointer transition-colors hover:text-foreground"
       onClick={() => {
+        // Reset local state to the latest server value before entering edit mode
         setName(workflow.name)
         setIsEditing(true)
       }}

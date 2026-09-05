@@ -20,10 +20,13 @@ import {
   Panel,
   ReactFlow,
 } from "@xyflow/react"
+import { useSetAtom } from "jotai"
 
 import { ErrorView, LoadingView } from "@/components/entity-components"
 import { nodeComponents } from "@/config/node-components"
 import { useSuspenseWorkflow } from "@/features/workflows/hooks/use-workflows"
+
+import { editorAtom } from "../store/atoms"
 
 import { AddNodeButton } from "./add-node-button"
 
@@ -39,15 +42,21 @@ export function EditorError() {
 
 /**
  * Main workflow editor: a React Flow canvas seeded with the workflow's
- * nodes/edges. State is local for now — persistence is not yet wired up.
+ * nodes/edges. State is local for now — persistence is triggered from the
+ * header's save button, which reads via `editorAtom`.
  */
 export function Editor({ workflowId }: { workflowId: string }) {
   const { data: workflow } = useSuspenseWorkflow(workflowId)
+
+  // Publish the React Flow instance to a global atom for other components
+  const setEditor = useSetAtom(editorAtom)
+
   const { theme, resolvedTheme } = useTheme()
 
   // Prefer the resolved theme so "system" maps to an actual light/dark value
   const colorMode = (resolvedTheme || theme || "system") as ColorMode
 
+  // Local canvas state, initialized from the server payload
   const [nodes, setNodes] = useState<Node[]>(workflow.nodes)
   const [edges, setEdges] = useState<Edge[]>(workflow.edges)
 
@@ -76,9 +85,16 @@ export function Editor({ workflowId }: { workflowId: string }) {
         fitView
         nodes={nodes}
         nodeTypes={nodeComponents}
+        // Drag = selection box; scroll = pan (Figma-like interaction)
+        panOnDrag={false}
+        panOnScroll
         proOptions={{ hideAttribution: true }}
+        selectionOnDrag
+        snapGrid={[10, 10]}
+        snapToGrid
         onConnect={onConnect}
         onEdgesChange={onEdgesChange}
+        onInit={setEditor}
         onNodesChange={onNodesChange}
       >
         <Background />

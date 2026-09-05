@@ -25,6 +25,7 @@ export const workflowsRouter = createTRPCRouter({
         userId: ctx.auth.user.id,
       })
 
+      // Seed the canvas with a single initial node at the origin
       await tx.orm.public.Node.create({
         workflowId: workflow.id,
         name: NodeType.INITIAL,
@@ -40,6 +41,7 @@ export const workflowsRouter = createTRPCRouter({
   remove: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      // Scoping by userId also handles cross-user access as "not found"
       const workflow = await db.orm.public.Workflow.where({
         id: input.id,
         userId: ctx.auth.user.id,
@@ -73,6 +75,93 @@ export const workflowsRouter = createTRPCRouter({
       }
 
       return workflow
+    }),
+
+  /** Updates a workflow's nodes and edges, scoped to the current user */
+  update: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        nodes: z.array(
+          z.object({
+            id: z.string(),
+            type: z.enum(Object.values(NodeType) as [string, ...string[]]).nullish(),
+            position: z.object({ x: z.number(), y: z.number() }),
+            data: z.record(z.string(), z.any()).optional(),
+          })
+        ),
+        edges: z.array(
+          z.object({
+            source: z.string(),
+            target: z.string(),
+            sourceHandle: z.string().nullish(),
+            targetHandle: z.string().nullish(),
+          })
+        ),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { id, nodes, edges } = input
+
+      // Verify ownership before mutating anything
+      const workflow = await db.orm.public.Workflow.where({
+        id,
+        userId: ctx.auth.user.id,
+      }).first()
+
+      if (!workflow) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Workflow not found",
+        })
+      }
+
+      // Transaction to ensure consistency
+      return db.transaction(async (tx) => {
+        // Validate that every edge references a node being submitted
+        const nodeIdSet = new Set(nodes.map((n) => n.id))
+        for (const edge of edges) {
+          if (!nodeIdSet.has(edge.source) || !nodeIdSet.has(edge.target)) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: `Edge references unknown node: source="${edge.source}", target="${edge.target}"`,
+            })
+          }
+        }
+
+        // Delete existing nodes and connections (cascade deletes connections)
+        await tx.orm.public.Node.where({ workflowId: id }).deleteAll()
+
+        // Create nodes
+        await tx.orm.public.Node.createAll(
+          nodes.map((node) => ({
+            id: node.id,
+            workflowId: id,
+            name: node.type || "unknown",
+            type: (node.type as NodeType) || NodeType.INITIAL,
+            position: node.position,
+            data: node.data || {},
+          }))
+        )
+
+        // Create connections; default handle names mirror the React Flow convention
+        await tx.orm.public.Connection.createAll(
+          edges.map((edge) => ({
+            workflowId: id,
+            fromNodeId: edge.source,
+            toNodeId: edge.target,
+            fromOutput: edge.sourceHandle || "main",
+            toInput: edge.targetHandle || "main",
+          }))
+        )
+
+        // Update workflow's updatedAt timestamp
+        await tx.orm.public.Workflow.where({ id }).update({
+          updatedAt: new Date().toISOString(),
+        })
+
+        return workflow
+      })
     }),
 
   /** Fetches a single workflow by id, scoped to the current user with react-flow compatible nodes and edges */

@@ -7,8 +7,12 @@ import { PlusIcon } from "lucide-react"
 import { NodeSelector } from "@/components/node-selector"
 import { Button } from "@/components/ui/button"
 
-/** Floating "+" button in the editor panel for adding a new node */
+/**
+ * Floating "+" button in the editor panel for adding a new node.
+ * Opens the `NodeSelector` popover on click.
+ */
 export const AddNodeButton = memo(() => {
+  // Controlled open state so both the button and popover trigger stay in sync
   const [selectorOpen, setSelectorOpen] = useState(false)
 
   return (
@@ -18,7 +22,7 @@ export const AddNodeButton = memo(() => {
         className="bg-background"
         size="icon"
         variant="outline"
-        onClick={() => {}} // TODO: open node picker
+        onClick={() => setSelectorOpen(true)}
       >
         <PlusIcon />
       </Button>
