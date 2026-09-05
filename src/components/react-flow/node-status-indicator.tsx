@@ -67,12 +67,12 @@ export const BorderLoadingIndicator = ({
         {/* Local keyframes so the animation is self-contained to this component */}
         <style>
           {`
-        @keyframes spin {
+        @keyframes node-border-spin {
           from { transform: translate(-50%, -50%) rotate(0deg); }
           to { transform: translate(-50%, -50%) rotate(360deg); }
         }
-        .spinner {
-          animation: spin 2s linear infinite;
+        .node-border-spinner {
+          animation: node-border-spin 2s linear infinite;
           position: absolute;
           left: 50%;
           top: 50%;
@@ -89,7 +89,7 @@ export const BorderLoadingIndicator = ({
           )}
         >
           {/* Conic gradient rotated to create the "chasing border" effect */}
-          <div className="spinner rounded-full bg-[conic-gradient(from_0deg_at_50%_50%,#2563eb_0deg,rgba(37,99,235,0)_360deg)] dark:bg-[conic-gradient(from_0deg_at_50%_50%,#60a5fa_0deg,rgba(96,165,250,0)_360deg)]" />
+          <div className="node-border-spinner rounded-full bg-[conic-gradient(from_0deg_at_50%_50%,#2563eb_0deg,rgba(37,99,235,0)_360deg)] dark:bg-[conic-gradient(from_0deg_at_50%_50%,#60a5fa_0deg,rgba(96,165,250,0)_360deg)]" />
         </div>
       </div>
       {children}
@@ -124,12 +124,20 @@ const StatusBorder = ({
  * Wraps a node with the appropriate status visualization.
  * Falls through to just rendering children for `initial`/unknown statuses.
  */
+const STATUS_LABELS: Record<Exclude<NodeStatus, "initial">, string> = {
+  loading: "Loading",
+  success: "Completed successfully",
+  error: "Error occurred",
+}
+
 export const NodeStatusIndicator = ({
   status,
   variant = "border",
   className,
   children,
 }: NodeStatusIndicatorProps) => {
+  const statusLabel =
+    status && status !== "initial" ? STATUS_LABELS[status] : undefined
   switch (status) {
     case "loading":
       // Pick between the two loading styles
@@ -137,12 +145,14 @@ export const NodeStatusIndicator = ({
         case "overlay":
           return (
             <SpinnerLoadingIndicator className={className}>
+              <StatusAnnouncer label={statusLabel} />
               {children}
             </SpinnerLoadingIndicator>
           )
         case "border":
           return (
             <BorderLoadingIndicator className={className}>
+              <StatusAnnouncer label={statusLabel} />
               {children}
             </BorderLoadingIndicator>
           )
@@ -157,12 +167,14 @@ export const NodeStatusIndicator = ({
             className
           )}
         >
+          <StatusAnnouncer label={statusLabel} />
           {children}
         </StatusBorder>
       )
     case "error":
       return (
         <StatusBorder className={cn("border-destructive", className)}>
+          <StatusAnnouncer label={statusLabel} />
           {children}
         </StatusBorder>
       )
@@ -171,3 +183,18 @@ export const NodeStatusIndicator = ({
       return <>{children}</>
   }
 }
+
+/**
+ * Visually hidden live-region that announces status changes to screen readers.
+ * Rendered alongside visual indicators so the announcement is tied to the node.
+ */
+const StatusAnnouncer = ({ label }: { label: string | undefined }) =>
+  label ? (
+    <span
+      aria-live="polite"
+      className="sr-only"
+      role="status"
+    >
+      {label}
+    </span>
+  ) : null

@@ -85,7 +85,7 @@ export const workflowsRouter = createTRPCRouter({
         nodes: z.array(
           z.object({
             id: z.string(),
-            type: z.string().nullish(),
+            type: z.enum(Object.values(NodeType) as [string, ...string[]]).nullish(),
             position: z.object({ x: z.number(), y: z.number() }),
             data: z.record(z.string(), z.any()).optional(),
           })
@@ -118,6 +118,17 @@ export const workflowsRouter = createTRPCRouter({
 
       // Transaction to ensure consistency
       return db.transaction(async (tx) => {
+        // Validate that every edge references a node being submitted
+        const nodeIdSet = new Set(nodes.map((n) => n.id))
+        for (const edge of edges) {
+          if (!nodeIdSet.has(edge.source) || !nodeIdSet.has(edge.target)) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: `Edge references unknown node: source="${edge.source}", target="${edge.target}"`,
+            })
+          }
+        }
+
         // Delete existing nodes and connections (cascade deletes connections)
         await tx.orm.public.Node.where({ workflowId: id }).deleteAll()
 
