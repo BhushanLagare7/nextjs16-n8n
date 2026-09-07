@@ -1,7 +1,7 @@
 "use client"
 import "@xyflow/react/dist/style.css"
 
-import { useCallback, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { useTheme } from "next-themes"
 
 import {
@@ -23,12 +23,14 @@ import {
 import { useSetAtom } from "jotai"
 
 import { ErrorView, LoadingView } from "@/components/entity-components"
+import { NodeType } from "@/config/constants"
 import { nodeComponents } from "@/config/node-components"
 import { useSuspenseWorkflow } from "@/features/workflows/hooks/use-workflows"
 
 import { editorAtom } from "../store/atoms"
 
 import { AddNodeButton } from "./add-node-button"
+import { ExecuteWorkflowButton } from "./execute-workflow-button"
 
 /** Fallback shown while the editor's suspense boundary is resolving */
 export function EditorLoading() {
@@ -77,6 +79,10 @@ export function Editor({ workflowId }: { workflowId: string }) {
     []
   )
 
+  const hasManualTrigger = useMemo(() => {
+    return nodes.some((node) => node.type === NodeType.MANUAL_TRIGGER)
+  }, [nodes])
+
   return (
     <div className="size-full">
       <ReactFlow
@@ -103,6 +109,11 @@ export function Editor({ workflowId }: { workflowId: string }) {
         <Panel position="top-right">
           <AddNodeButton />
         </Panel>
+        {hasManualTrigger && (
+          <Panel position="bottom-center">
+            <ExecuteWorkflowButton workflowId={workflowId} />
+          </Panel>
+        )}
       </ReactFlow>
     </div>
   )
