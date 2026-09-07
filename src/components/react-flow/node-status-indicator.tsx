@@ -190,11 +190,7 @@ export const NodeStatusIndicator = ({
  */
 const StatusAnnouncer = ({ label }: { label: string | undefined }) =>
   label ? (
-    <span
-      aria-live="polite"
-      className="sr-only"
-      role="status"
-    >
+    <span aria-live="polite" className="sr-only" role="status">
       {label}
     </span>
   ) : null

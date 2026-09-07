@@ -7,14 +7,13 @@ import { GlobeIcon } from "lucide-react"
 
 import { BaseExecutionNode } from "../base-execution-node"
 
-import { FormType, HttpRequestDialog } from "./dialog"
+import { HttpRequestDialog, HttpRequestFormValues } from "./dialog"
 
 /** User-configured data stored on an HTTP Request node */
 type HttpRequestNodeData = {
   endpoint?: string
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"
   body?: string
-  [key: string]: unknown
 }
 
 type HttpRequestNodeType = Node<HttpRequestNodeData>
@@ -35,7 +34,7 @@ export const HttpRequestNode = memo((props: NodeProps<HttpRequestNodeType>) => {
   }
 
   /** Persist dialog values back onto the node's `data` object */
-  const handleSubmit = (values: FormType) => {
+  const handleSubmit = (values: HttpRequestFormValues) => {
     setNodes((nodes) =>
       nodes.map((node) => {
         if (node.id === props.id) {
@@ -43,9 +42,7 @@ export const HttpRequestNode = memo((props: NodeProps<HttpRequestNodeType>) => {
             ...node,
             data: {
               ...node.data,
-              endpoint: values.endpoint,
-              method: values.method,
-              body: values.body,
+              ...values,
             },
           }
         }
@@ -64,9 +61,7 @@ export const HttpRequestNode = memo((props: NodeProps<HttpRequestNodeType>) => {
   return (
     <>
       <HttpRequestDialog
-        defaultBody={nodeData.body}
-        defaultEndpoint={nodeData.endpoint} // TODO: Check if it can be improved by just sending initialValues={nodeData}
-        defaultMethod={nodeData.method}
+        defaultValues={nodeData}
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         onSubmit={handleSubmit}

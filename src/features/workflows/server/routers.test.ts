@@ -12,6 +12,7 @@ import assert from "node:assert"
 import { describe, it, type TestContext } from "node:test"
 
 import { NodeType } from "@/config/constants"
+import { inngest } from "@/inngest/client"
 import { polarClient } from "@/lib/polar"
 import { db } from "@/prisma/db"
 
@@ -21,24 +22,36 @@ import { workflowsRouter } from "./routers"
 // Fixtures
 // ---------------------------------------------------------------------------
 
-/** Identifier of the user every authenticated call is made on behalf of. */
+/**
+ * Identifier of the user every authenticated call is made on behalf of.
+ */
 const TEST_USER_ID = "test-user-id"
 
-/** Error message emitted by the router when a workflow cannot be located. */
+/**
+ * Error message emitted by the router when a workflow cannot be located.
+ */
 const WORKFLOW_NOT_FOUND_MESSAGE = "Workflow not found"
 
-/** Resolved return type of `polarClient.customers.getStateExternal`. */
+/**
+ * Resolved return type of `polarClient.customers.getStateExternal`.
+ */
 type CustomerState = Awaited<
   ReturnType<typeof polarClient.customers.getStateExternal>
 >
 
-/** Produces fresh `createdAt`/`updatedAt` ISO timestamps. */
+/**
+ * Produces fresh ISO timestamps for entity creation and updates.
+ *
+ * @returns An object containing `createdAt` and `updatedAt` ISO strings.
+ */
 const timestamps = () => ({
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 })
 
-/** Authenticated context used for the "happy path" caller. */
+/**
+ * Authenticated context fixture used for the "happy path" caller.
+ */
 const testAuth = {
   user: {
     id: TEST_USER_ID,
@@ -56,10 +69,27 @@ const testAuth = {
   },
 }
 
-/** Caller with a valid authenticated session. */
+/**
+ * Base workflow fixture to ensure consistent entity shape across tests.
+ */
+const baseWorkflowFixture = (id: string, name: string) => ({
+  id,
+  name,
+  userId: TEST_USER_ID,
+})
+
+/**
+ * Common invalid single-id inputs for procedures expecting `{ id: string }`.
+ */
+const invalidIdInputs: ReadonlyArray<[label: string, input: unknown]> = [
+  ["non-string id", { id: 123 }],
+  ["missing id", {}],
+]
+
+/** Caller configured with a valid authenticated session. */
 const caller = workflowsRouter.createCaller({ auth: testAuth })
 
-/** Caller with no session – used to verify authorization guards. */
+/** Caller configured with no session to verify authorization guards. */
 const unauthenticatedCaller = workflowsRouter.createCaller({ auth: null })
 
 // ---------------------------------------------------------------------------
@@ -68,7 +98,11 @@ const unauthenticatedCaller = workflowsRouter.createCaller({ auth: null })
 
 /**
  * Creates a validator for `assert.rejects` that asserts the rejection reason
- * is a `TRPCError` with the given `code` and, when supplied, `message`.
+ * is a `TRPCError` with the given `code` and optional `message`.
+ *
+ * @param code - The expected TRPC error code (e.g., "UNAUTHORIZED").
+ * @param message - The expected TRPC error message (optional).
+ * @returns A predicate function for `assert.rejects`.
  */
 const expectTRPCError =
   (code: TRPCError["code"], message?: string) =>
@@ -82,6 +116,10 @@ const expectTRPCError =
 /**
  * Stubs `polarClient.customers.getStateExternal` so the router observes the
  * provided list of active subscriptions.
+ *
+ * @param t - The active test context.
+ * @param activeSubscriptions - Array of mock subscriptions to return.
+ * @returns The mock method instance.
  */
 const mockCustomerState = (t: TestContext, activeSubscriptions: unknown[]) =>
   t.mock.method(
@@ -93,6 +131,10 @@ const mockCustomerState = (t: TestContext, activeSubscriptions: unknown[]) =>
 /**
  * Stubs `db.orm.public.Workflow.where` to return the supplied query object.
  * The returned mock exposes the captured predicate via `mock.calls`.
+ *
+ * @param t - The active test context.
+ * @param query - The mock query chain to return from `.where()`.
+ * @returns The mock method instance.
  */
 const mockWorkflowWhere = <Query extends object>(
   t: TestContext,
@@ -102,12 +144,182 @@ const mockWorkflowWhere = <Query extends object>(
 /**
  * Builds a chainable query stub where `include()` is a no-op returning the
  * chain itself and `first()` resolves to `result`.
+ *
+ * @param result - The data to resolve when `.first()` is invoked.
+ * @returns A mock query chain object.
  */
 const includeFirstChain = <Result>(result: Result) => ({
   include() {
     return this
   },
   first: async () => result,
+})
+
+/** Options to configure the chainable query stub for `getMany`. */
+interface MockGetManyOptions<Item> {
+  items: Item[]
+  totalCount: number
+}
+
+/**
+ * Builds a chainable query stub for `getMany` operations supporting `.where()`,
+ * `.orderBy()`, `.offset()`, `.limit()`, `.all()`, and `.aggregate()`.
+ *
+ * @param options - Configuration containing items and totalCount to return.
+ * @returns An object containing the query chain and captured execution state.
+ */
+const createGetManyQueryMock = <Item>(options: MockGetManyOptions<Item>) => {
+  const chainedWherePredicates: Array<(w: unknown) => unknown> = []
+  let capturedOrderByFn: ((w: unknown) => unknown) | null = null
+  let capturedOffset: number | null = null
+  let capturedLimit: number | null = null
+
+  const queryChain = {
+    where(predicate: (w: unknown) => unknown) {
+      chainedWherePredicates.push(predicate)
+      return queryChain
+    },
+    orderBy(fn: (w: unknown) => unknown) {
+      capturedOrderByFn = fn
+      return {
+        offset(offsetVal: number) {
+          capturedOffset = offsetVal
+          return {
+            limit(limitVal: number) {
+              capturedLimit = limitVal
+              return {
+                all: async () => options.items,
+              }
+            },
+          }
+        },
+      }
+    },
+    aggregate: async () => ({ count: options.totalCount }),
+  }
+
+  return {
+    queryChain,
+    chainedWherePredicates,
+    getCapturedOrderBy: () => capturedOrderByFn,
+    getCapturedOffset: () => capturedOffset,
+    getCapturedLimit: () => capturedLimit,
+  }
+}
+
+/**
+ * Stubs the database transaction manager to immediately execute the callback
+ * with the provided fake transaction context.
+ *
+ * @param t - The active test context.
+ * @param fakeTx - The simulated transaction object to inject.
+ */
+const mockDbTransaction = <T>(t: TestContext, fakeTx: T) => {
+  t.mock.method(db, "transaction", async (cb: (tx: T) => Promise<unknown>) =>
+    cb(fakeTx)
+  )
+}
+
+/**
+ * Creates a mock transaction object and spies for workflow update operations.
+ *
+ * @param t - The active test context.
+ * @param existingWorkflow - The baseline workflow being updated.
+ * @returns An object containing the fake transaction and individual mutation spies.
+ */
+const createUpdateTxMock = (
+  t: TestContext,
+  existingWorkflow: ReturnType<typeof baseWorkflowFixture>
+) => {
+  const deleteNodesMock = t.mock.fn(async () => [])
+  const createNodesMock = t.mock.fn(async (data: unknown[]) => data)
+  const createConnectionsMock = t.mock.fn(async (data: unknown[]) => data)
+  const updateWorkflowMock = t.mock.fn(
+    async (data: Record<string, unknown>) => ({
+      ...existingWorkflow,
+      ...data,
+    })
+  )
+
+  const fakeTx = {
+    orm: {
+      public: {
+        Node: {
+          where: t.mock.fn(() => ({ deleteAll: deleteNodesMock })),
+          createAll: createNodesMock,
+        },
+        Connection: {
+          createAll: createConnectionsMock,
+        },
+        Workflow: {
+          where: t.mock.fn(() => ({ update: updateWorkflowMock })),
+        },
+      },
+    },
+  }
+
+  return {
+    fakeTx,
+    deleteNodesMock,
+    createNodesMock,
+    createConnectionsMock,
+    updateWorkflowMock,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// execute
+// ---------------------------------------------------------------------------
+
+describe("workflowsRouter.execute", () => {
+  it("rejects unauthenticated caller with UNAUTHORIZED", async () => {
+    await assert.rejects(
+      unauthenticatedCaller.execute({ id: "test-id" }),
+      expectTRPCError("UNAUTHORIZED")
+    )
+  })
+
+  for (const [label, input] of invalidIdInputs) {
+    it(`rejects ${label} with BAD_REQUEST`, async () => {
+      await assert.rejects(
+        caller.execute(input as Parameters<typeof caller.execute>[0]),
+        expectTRPCError("BAD_REQUEST")
+      )
+    })
+  }
+
+  it("throws NOT_FOUND when workflow does not exist or does not belong to user", async (t) => {
+    mockWorkflowWhere(t, { first: async () => null })
+
+    await assert.rejects(
+      caller.execute({ id: "missing-id" }),
+      expectTRPCError("NOT_FOUND", WORKFLOW_NOT_FOUND_MESSAGE)
+    )
+  })
+
+  it("executes workflow, sends inngest event, and returns workflow when found", async (t) => {
+    const existingWorkflow = baseWorkflowFixture("wf-1", "Test Workflow")
+
+    const whereMock = mockWorkflowWhere(t, {
+      first: async () => existingWorkflow,
+    })
+    const inngestSendMock = t.mock.method(inngest, "send", async () => ({
+      ids: ["evt_123"],
+    }))
+
+    const result = await caller.execute({ id: "wf-1" })
+
+    assert.deepStrictEqual(result, existingWorkflow)
+    assert.deepStrictEqual(whereMock.mock.calls[0]?.arguments[0], {
+      id: "wf-1",
+      userId: TEST_USER_ID,
+    })
+    assert.strictEqual(inngestSendMock.mock.calls.length, 1)
+    assert.deepStrictEqual(inngestSendMock.mock.calls[0]?.arguments[0], {
+      name: "workflows/execute.workflow",
+      data: { workflowId: "wf-1" },
+    })
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -154,11 +366,7 @@ describe("workflowsRouter.create", () => {
       },
     }
 
-    t.mock.method(
-      db,
-      "transaction",
-      async (cb: (tx: typeof fakeTx) => Promise<unknown>) => cb(fakeTx)
-    )
+    mockDbTransaction(t, fakeTx)
 
     const result = await caller.create()
 
@@ -192,21 +400,14 @@ describe("workflowsRouter.remove", () => {
     )
   })
 
-  it("rejects non-string id with BAD_REQUEST", async () => {
-    await assert.rejects(
-      // @ts-expect-error testing invalid input type
-      caller.remove({ id: 123 }),
-      expectTRPCError("BAD_REQUEST")
-    )
-  })
-
-  it("rejects missing id with BAD_REQUEST", async () => {
-    await assert.rejects(
-      // @ts-expect-error testing invalid input type
-      caller.remove({}),
-      expectTRPCError("BAD_REQUEST")
-    )
-  })
+  for (const [label, input] of invalidIdInputs) {
+    it(`rejects ${label} with BAD_REQUEST`, async () => {
+      await assert.rejects(
+        caller.remove(input as Parameters<typeof caller.remove>[0]),
+        expectTRPCError("BAD_REQUEST")
+      )
+    })
+  }
 
   it("throws NOT_FOUND when workflow does not exist or does not belong to user", async (t) => {
     mockWorkflowWhere(t, { delete: async () => null })
@@ -218,12 +419,10 @@ describe("workflowsRouter.remove", () => {
   })
 
   it("deletes and returns the workflow when found", async (t) => {
-    const deletedWorkflow = {
-      id: "wf-to-delete",
-      name: "Deleted Workflow",
-      userId: TEST_USER_ID,
-      ...timestamps(),
-    }
+    const deletedWorkflow = baseWorkflowFixture(
+      "wf-to-delete",
+      "Deleted Workflow"
+    )
 
     const whereMock = mockWorkflowWhere(t, {
       delete: async () => deletedWorkflow,
@@ -251,44 +450,24 @@ describe("workflowsRouter.updateName", () => {
     )
   })
 
-  it("rejects empty name string with BAD_REQUEST", async () => {
-    await assert.rejects(
-      caller.updateName({ id: "test-id", name: "" }),
-      expectTRPCError("BAD_REQUEST")
-    )
-  })
+  const invalidUpdateNameInputs: ReadonlyArray<
+    [label: string, input: unknown]
+  > = [
+    ["empty name string", { id: "test-id", name: "" }],
+    ["missing name", { id: "test-id" }],
+    ["non-string name", { id: "test-id", name: 123 }],
+    ["missing id", { name: "New Name" }],
+    ["non-string id", { id: 123, name: "New Name" }],
+  ]
 
-  it("rejects missing name with BAD_REQUEST", async () => {
-    await assert.rejects(
-      // @ts-expect-error testing invalid input type
-      caller.updateName({ id: "test-id" }),
-      expectTRPCError("BAD_REQUEST")
-    )
-  })
-
-  it("rejects non-string name with BAD_REQUEST", async () => {
-    await assert.rejects(
-      // @ts-expect-error testing invalid input type
-      caller.updateName({ id: "test-id", name: 123 }),
-      expectTRPCError("BAD_REQUEST")
-    )
-  })
-
-  it("rejects missing id with BAD_REQUEST", async () => {
-    await assert.rejects(
-      // @ts-expect-error testing invalid input type
-      caller.updateName({ name: "New Name" }),
-      expectTRPCError("BAD_REQUEST")
-    )
-  })
-
-  it("rejects non-string id with BAD_REQUEST", async () => {
-    await assert.rejects(
-      // @ts-expect-error testing invalid input type
-      caller.updateName({ id: 123, name: "New Name" }),
-      expectTRPCError("BAD_REQUEST")
-    )
-  })
+  for (const [label, input] of invalidUpdateNameInputs) {
+    it(`rejects ${label} with BAD_REQUEST`, async () => {
+      await assert.rejects(
+        caller.updateName(input as Parameters<typeof caller.updateName>[0]),
+        expectTRPCError("BAD_REQUEST")
+      )
+    })
+  }
 
   it("throws NOT_FOUND when workflow does not exist or does not belong to user", async (t) => {
     mockWorkflowWhere(t, { update: async () => null })
@@ -300,12 +479,7 @@ describe("workflowsRouter.updateName", () => {
   })
 
   it("updates and returns the workflow when found", async (t) => {
-    const updatedWorkflow = {
-      id: "wf-1",
-      name: "Renamed Workflow",
-      userId: TEST_USER_ID,
-      ...timestamps(),
-    }
+    const updatedWorkflow = baseWorkflowFixture("wf-1", "Renamed Workflow")
 
     const update = t.mock.fn(async (data: Record<string, unknown>) => {
       void data
@@ -341,37 +515,49 @@ describe("workflowsRouter.update", () => {
     )
   })
 
-  it("rejects missing id with BAD_REQUEST", async () => {
-    await assert.rejects(
-      // @ts-expect-error testing invalid input type
-      caller.update({ nodes: [], edges: [] }),
-      expectTRPCError("BAD_REQUEST")
-    )
-  })
+  const invalidUpdateInputs: ReadonlyArray<[label: string, input: unknown]> = [
+    ["missing id", { nodes: [], edges: [] }],
+    ["non-string id", { id: 123, nodes: [], edges: [] }],
+    ["invalid nodes input", { id: "test-id", nodes: "invalid", edges: [] }],
+    ["invalid edges input", { id: "test-id", nodes: [], edges: "invalid" }],
+    [
+      "node with invalid NodeType enum value",
+      {
+        id: "wf-1",
+        nodes: [
+          {
+            id: "node-1",
+            type: "INVALID_NODE_TYPE",
+            position: { x: 0, y: 0 },
+          },
+        ],
+        edges: [],
+      },
+    ],
+    [
+      "node with invalid position coordinates",
+      {
+        id: "wf-1",
+        nodes: [
+          {
+            id: "node-1",
+            type: NodeType.INITIAL,
+            position: { x: "not-a-number", y: 0 },
+          },
+        ],
+        edges: [],
+      },
+    ],
+  ]
 
-  it("rejects non-string id with BAD_REQUEST", async () => {
-    await assert.rejects(
-      // @ts-expect-error testing invalid input type
-      caller.update({ id: 123, nodes: [], edges: [] }),
-      expectTRPCError("BAD_REQUEST")
-    )
-  })
-
-  it("rejects invalid nodes input with BAD_REQUEST", async () => {
-    await assert.rejects(
-      // @ts-expect-error testing invalid input type
-      caller.update({ id: "test-id", nodes: "invalid", edges: [] }),
-      expectTRPCError("BAD_REQUEST")
-    )
-  })
-
-  it("rejects invalid edges input with BAD_REQUEST", async () => {
-    await assert.rejects(
-      // @ts-expect-error testing invalid input type
-      caller.update({ id: "test-id", nodes: [], edges: "invalid" }),
-      expectTRPCError("BAD_REQUEST")
-    )
-  })
+  for (const [label, input] of invalidUpdateInputs) {
+    it(`rejects ${label} with BAD_REQUEST`, async () => {
+      await assert.rejects(
+        caller.update(input as Parameters<typeof caller.update>[0]),
+        expectTRPCError("BAD_REQUEST")
+      )
+    })
+  }
 
   it("throws NOT_FOUND when workflow does not exist or does not belong to user", async (t) => {
     mockWorkflowWhere(t, { first: async () => null })
@@ -383,53 +569,18 @@ describe("workflowsRouter.update", () => {
   })
 
   it("deletes old nodes, creates new nodes and connections, touches updatedAt and returns workflow", async (t) => {
-    const existingWorkflow = {
-      id: "wf-1",
-      name: "Existing Workflow",
-      userId: TEST_USER_ID,
-      ...timestamps(),
-    }
-
+    const existingWorkflow = baseWorkflowFixture("wf-1", "Existing Workflow")
     mockWorkflowWhere(t, { first: async () => existingWorkflow })
 
-    const deleteNodesMock = t.mock.fn(async () => [])
-    const createNodesMock = t.mock.fn(async (data: unknown[]) => data)
-    const createConnectionsMock = t.mock.fn(async (data: unknown[]) => data)
-    const updateWorkflowMock = t.mock.fn(
-      async (data: Record<string, unknown>) => ({
-        ...existingWorkflow,
-        ...data,
-      })
-    )
+    const {
+      fakeTx,
+      deleteNodesMock,
+      createNodesMock,
+      createConnectionsMock,
+      updateWorkflowMock,
+    } = createUpdateTxMock(t, existingWorkflow)
 
-    const fakeTx = {
-      orm: {
-        public: {
-          Node: {
-            where: t.mock.fn((filter: Record<string, unknown>) => {
-              void filter
-              return { deleteAll: deleteNodesMock }
-            }),
-            createAll: createNodesMock,
-          },
-          Connection: {
-            createAll: createConnectionsMock,
-          },
-          Workflow: {
-            where: t.mock.fn((filter: Record<string, unknown>) => {
-              void filter
-              return { update: updateWorkflowMock }
-            }),
-          },
-        },
-      },
-    }
-
-    t.mock.method(
-      db,
-      "transaction",
-      async (cb: (tx: typeof fakeTx) => Promise<unknown>) => cb(fakeTx)
-    )
+    mockDbTransaction(t, fakeTx)
 
     const nodesInput = [
       {
@@ -465,11 +616,8 @@ describe("workflowsRouter.update", () => {
     })
 
     assert.deepStrictEqual(result, existingWorkflow)
-
-    // Verify node deletion
     assert.strictEqual(deleteNodesMock.mock.calls.length, 1)
 
-    // Verify nodes created
     assert.strictEqual(createNodesMock.mock.calls.length, 1)
     assert.deepStrictEqual(createNodesMock.mock.calls[0]?.arguments[0], [
       {
@@ -490,7 +638,6 @@ describe("workflowsRouter.update", () => {
       },
     ])
 
-    // Verify connections created
     assert.strictEqual(createConnectionsMock.mock.calls.length, 1)
     assert.deepStrictEqual(createConnectionsMock.mock.calls[0]?.arguments[0], [
       {
@@ -509,12 +656,103 @@ describe("workflowsRouter.update", () => {
       },
     ])
 
-    // Verify workflow updatedAt update
     assert.strictEqual(updateWorkflowMock.mock.calls.length, 1)
     const updateArg = updateWorkflowMock.mock.calls[0]?.arguments[0] as {
       updatedAt?: string
     }
     assert(typeof updateArg?.updatedAt === "string")
+  })
+
+  it("rejects when edge references unknown source node with BAD_REQUEST", async (t) => {
+    const existingWorkflow = baseWorkflowFixture("wf-1", "Existing Workflow")
+    mockWorkflowWhere(t, { first: async () => existingWorkflow })
+
+    mockDbTransaction(t, {})
+
+    await assert.rejects(
+      caller.update({
+        id: "wf-1",
+        nodes: [
+          {
+            id: "node-1",
+            type: NodeType.INITIAL,
+            position: { x: 0, y: 0 },
+          },
+        ],
+        edges: [
+          {
+            source: "node-missing",
+            target: "node-1",
+          },
+        ],
+      }),
+      expectTRPCError(
+        "BAD_REQUEST",
+        'Edge references unknown node: source="node-missing", target="node-1"'
+      )
+    )
+  })
+
+  it("rejects when edge references unknown target node with BAD_REQUEST", async (t) => {
+    const existingWorkflow = baseWorkflowFixture("wf-1", "Existing Workflow")
+    mockWorkflowWhere(t, { first: async () => existingWorkflow })
+
+    mockDbTransaction(t, {})
+
+    await assert.rejects(
+      caller.update({
+        id: "wf-1",
+        nodes: [
+          {
+            id: "node-1",
+            type: NodeType.INITIAL,
+            position: { x: 0, y: 0 },
+          },
+        ],
+        edges: [
+          {
+            source: "node-1",
+            target: "node-missing",
+          },
+        ],
+      }),
+      expectTRPCError(
+        "BAD_REQUEST",
+        'Edge references unknown node: source="node-1", target="node-missing"'
+      )
+    )
+  })
+
+  it("handles empty nodes and edges arrays successfully", async (t) => {
+    const existingWorkflow = baseWorkflowFixture("wf-1", "Existing Workflow")
+    mockWorkflowWhere(t, { first: async () => existingWorkflow })
+
+    const {
+      fakeTx,
+      deleteNodesMock,
+      createNodesMock,
+      createConnectionsMock,
+      updateWorkflowMock,
+    } = createUpdateTxMock(t, existingWorkflow)
+
+    mockDbTransaction(t, fakeTx)
+
+    const result = await caller.update({
+      id: "wf-1",
+      nodes: [],
+      edges: [],
+    })
+
+    assert.deepStrictEqual(result, existingWorkflow)
+    assert.strictEqual(deleteNodesMock.mock.calls.length, 1)
+    assert.strictEqual(createNodesMock.mock.calls.length, 1)
+    assert.deepStrictEqual(createNodesMock.mock.calls[0]?.arguments[0], [])
+    assert.strictEqual(createConnectionsMock.mock.calls.length, 1)
+    assert.deepStrictEqual(
+      createConnectionsMock.mock.calls[0]?.arguments[0],
+      []
+    )
+    assert.strictEqual(updateWorkflowMock.mock.calls.length, 1)
   })
 })
 
@@ -530,21 +768,14 @@ describe("workflowsRouter.getOne", () => {
     )
   })
 
-  it("rejects non-string id with BAD_REQUEST", async () => {
-    await assert.rejects(
-      // @ts-expect-error testing invalid input type
-      caller.getOne({ id: 123 }),
-      expectTRPCError("BAD_REQUEST")
-    )
-  })
-
-  it("rejects missing id with BAD_REQUEST", async () => {
-    await assert.rejects(
-      // @ts-expect-error testing invalid input type
-      caller.getOne({}),
-      expectTRPCError("BAD_REQUEST")
-    )
-  })
+  for (const [label, input] of invalidIdInputs) {
+    it(`rejects ${label} with BAD_REQUEST`, async () => {
+      await assert.rejects(
+        caller.getOne(input as Parameters<typeof caller.getOne>[0]),
+        expectTRPCError("BAD_REQUEST")
+      )
+    })
+  }
 
   it("throws NOT_FOUND when workflow does not exist or does not belong to user", async (t) => {
     mockWorkflowWhere(t, includeFirstChain(null))
@@ -557,9 +788,7 @@ describe("workflowsRouter.getOne", () => {
 
   it("transforms and returns react-flow compatible nodes and edges", async (t) => {
     const mockWorkflowData = {
-      id: "wf-1",
-      name: "My Workflow",
-      userId: TEST_USER_ID,
+      ...baseWorkflowFixture("wf-1", "My Workflow"),
       nodes: [
         {
           id: "node-1",
@@ -619,6 +848,27 @@ describe("workflowsRouter.getOne", () => {
       },
     ])
   })
+
+  it("handles workflow with empty nodes and connections and verifies user scoping", async (t) => {
+    const emptyWorkflow = {
+      ...baseWorkflowFixture("wf-empty", "Empty Workflow"),
+      nodes: [],
+      connections: [],
+    }
+
+    const whereMock = mockWorkflowWhere(t, includeFirstChain(emptyWorkflow))
+
+    const result = await caller.getOne({ id: "wf-empty" })
+
+    assert.strictEqual(result.id, "wf-empty")
+    assert.strictEqual(result.name, "Empty Workflow")
+    assert.deepStrictEqual(result.nodes, [])
+    assert.deepStrictEqual(result.edges, [])
+    assert.deepStrictEqual(whereMock.mock.calls[0]?.arguments[0], {
+      id: "wf-empty",
+      userId: TEST_USER_ID,
+    })
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -635,20 +885,176 @@ describe("workflowsRouter.getMany input boundary validation", () => {
 
   /** Pagination inputs that must be rejected by the input schema. */
   const invalidPaginationInputs: ReadonlyArray<
-    [label: string, input: Parameters<typeof caller.getMany>[0]]
+    [label: string, input: unknown]
   > = [
     ["page value 0", { page: 0 }],
     ["page value -1", { page: -1 }],
     ["non-integer page value 1.5", { page: 1.5 }],
     ["non-integer pageSize value 1.5", { pageSize: 1.5 }],
+    ["pageSize value 0 (< MIN_PAGE_SIZE)", { pageSize: 0 }],
+    ["pageSize value -1", { pageSize: -1 }],
+    ["pageSize value 101 (> MAX_PAGE_SIZE)", { pageSize: 101 }],
+    ["non-string search value", { search: 123 }],
+    ["non-number page value", { page: "1" }],
+    ["non-number pageSize value", { pageSize: "5" }],
   ]
 
   for (const [label, input] of invalidPaginationInputs) {
     it(`rejects ${label} with BAD_REQUEST`, async () => {
       await assert.rejects(
-        caller.getMany(input),
+        caller.getMany(input as Parameters<typeof caller.getMany>[0]),
         expectTRPCError("BAD_REQUEST")
       )
     })
   }
+})
+
+// ---------------------------------------------------------------------------
+// getMany query execution and pagination
+// ---------------------------------------------------------------------------
+
+describe("workflowsRouter.getMany query execution and pagination", () => {
+  it("returns paginated workflows with default parameters and derives pagination metadata", async (t) => {
+    const mockItems = [
+      baseWorkflowFixture("wf-1", "Workflow 1"),
+      baseWorkflowFixture("wf-2", "Workflow 2"),
+    ]
+
+    const {
+      queryChain,
+      getCapturedOrderBy,
+      getCapturedOffset,
+      getCapturedLimit,
+    } = createGetManyQueryMock({
+      items: mockItems,
+      totalCount: 12,
+    })
+
+    const whereMock = mockWorkflowWhere(t, queryChain)
+
+    const result = await caller.getMany({})
+
+    assert.deepStrictEqual(result.items, mockItems)
+    assert.strictEqual(result.page, 1)
+    assert.strictEqual(result.pageSize, 5)
+    assert.strictEqual(result.totalCount, 12)
+    assert.strictEqual(result.totalPages, 3)
+    assert.strictEqual(result.hasNextPage, true)
+    assert.strictEqual(result.hasPreviousPage, false)
+
+    // Verify offset and limit for page 1 with default pageSize 5
+    assert.strictEqual(getCapturedOffset(), 0)
+    assert.strictEqual(getCapturedLimit(), 5)
+
+    // Verify where callback scoped to current user id
+    const initialPredicate = whereMock.mock.calls[0]?.arguments[0] as (w: {
+      userId: { eq: (id: string) => unknown }
+    }) => unknown
+    const eqMock = t.mock.fn()
+    initialPredicate({ userId: { eq: eqMock } })
+    assert.strictEqual(eqMock.mock.calls.length, 1)
+    assert.strictEqual(eqMock.mock.calls[0]?.arguments[0], TEST_USER_ID)
+
+    // Verify orderBy clause sorts by updatedAt desc
+    const orderByFn = getCapturedOrderBy() as (w: {
+      updatedAt: { desc: () => unknown }
+    }) => unknown
+    const descMock = t.mock.fn()
+    orderByFn({ updatedAt: { desc: descMock } })
+    assert.strictEqual(descMock.mock.calls.length, 1)
+  })
+
+  it("derives hasNextPage=false and hasPreviousPage=true on the last page", async (t) => {
+    const mockItems = [
+      baseWorkflowFixture("wf-11", "Workflow 11"),
+      baseWorkflowFixture("wf-12", "Workflow 12"),
+    ]
+
+    const { queryChain, getCapturedOffset, getCapturedLimit } =
+      createGetManyQueryMock({
+        items: mockItems,
+        totalCount: 12,
+      })
+
+    mockWorkflowWhere(t, queryChain)
+
+    const result = await caller.getMany({ page: 3, pageSize: 5 })
+
+    assert.strictEqual(result.page, 3)
+    assert.strictEqual(result.pageSize, 5)
+    assert.strictEqual(result.totalCount, 12)
+    assert.strictEqual(result.totalPages, 3)
+    assert.strictEqual(result.hasNextPage, false)
+    assert.strictEqual(result.hasPreviousPage, true)
+    assert.strictEqual(getCapturedOffset(), 10)
+    assert.strictEqual(getCapturedLimit(), 5)
+  })
+
+  it("derives hasNextPage=true and hasPreviousPage=true on an intermediate page", async (t) => {
+    const mockItems = [baseWorkflowFixture("wf-6", "Workflow 6")]
+
+    const { queryChain, getCapturedOffset, getCapturedLimit } =
+      createGetManyQueryMock({
+        items: mockItems,
+        totalCount: 12,
+      })
+
+    mockWorkflowWhere(t, queryChain)
+
+    const result = await caller.getMany({ page: 2, pageSize: 5 })
+
+    assert.strictEqual(result.page, 2)
+    assert.strictEqual(result.pageSize, 5)
+    assert.strictEqual(result.totalCount, 12)
+    assert.strictEqual(result.totalPages, 3)
+    assert.strictEqual(result.hasNextPage, true)
+    assert.strictEqual(result.hasPreviousPage, true)
+    assert.strictEqual(getCapturedOffset(), 5)
+    assert.strictEqual(getCapturedLimit(), 5)
+  })
+
+  it("handles empty workflow list when totalCount is 0", async (t) => {
+    const { queryChain } = createGetManyQueryMock({
+      items: [],
+      totalCount: 0,
+    })
+
+    mockWorkflowWhere(t, queryChain)
+
+    const result = await caller.getMany({ page: 1, pageSize: 10 })
+
+    assert.deepStrictEqual(result.items, [])
+    assert.strictEqual(result.page, 1)
+    assert.strictEqual(result.pageSize, 10)
+    assert.strictEqual(result.totalCount, 0)
+    assert.strictEqual(result.totalPages, 0)
+    assert.strictEqual(result.hasNextPage, false)
+    assert.strictEqual(result.hasPreviousPage, false)
+  })
+
+  it("applies search filter with ilike when search is provided", async (t) => {
+    const mockItems = [baseWorkflowFixture("wf-search-1", "Invoice Processor")]
+
+    const { queryChain, chainedWherePredicates } = createGetManyQueryMock({
+      items: mockItems,
+      totalCount: 1,
+    })
+
+    mockWorkflowWhere(t, queryChain)
+
+    const result = await caller.getMany({ search: "invoice" })
+
+    assert.deepStrictEqual(result.items, mockItems)
+    assert.strictEqual(result.totalCount, 1)
+
+    // Verify search filter was appended to the where chain
+    assert.strictEqual(chainedWherePredicates.length, 1)
+    const searchPredicate = chainedWherePredicates[0] as (w: {
+      name: { ilike: (pattern: string) => unknown }
+    }) => unknown
+    const ilikeMock = t.mock.fn()
+    searchPredicate({ name: { ilike: ilikeMock } })
+    assert.strictEqual(ilikeMock.mock.calls.length, 1)
+    assert.strictEqual(ilikeMock.mock.calls[0]?.arguments[0], "%invoice%")
+  })
 })

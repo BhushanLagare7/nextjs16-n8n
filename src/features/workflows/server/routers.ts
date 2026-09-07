@@ -4,6 +4,7 @@ import { generateSlug } from "random-word-slugs"
 import { z } from "zod"
 
 import { NodeType, PAGINATION } from "@/config/constants"
+import { inngest } from "@/inngest/client"
 import { db } from "@/prisma/db"
 import {
   createTRPCRouter,
@@ -16,6 +17,30 @@ import {
  * All procedures require authentication and scope results to the current user.
  */
 export const workflowsRouter = createTRPCRouter({
+  execute: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      // Scoping by userId also handles cross-user access as "not found"
+      const workflow = await db.orm.public.Workflow.where({
+        id: input.id,
+        userId: ctx.auth.user.id,
+      }).first()
+
+      // Also covers workflows that exist but belong to another user
+      if (!workflow) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Workflow not found",
+        })
+      }
+
+      await inngest.send({
+        name: "workflows/execute.workflow",
+        data: { workflowId: input.id },
+      })
+
+      return workflow
+    }),
   /** Creates a new workflow with an initial node. Requires a premium plan. */
   create: premiumProcedure.mutation(async ({ ctx }) => {
     // Transaction so a workflow is never left without its initial node
@@ -85,7 +110,9 @@ export const workflowsRouter = createTRPCRouter({
         nodes: z.array(
           z.object({
             id: z.string(),
-            type: z.enum(Object.values(NodeType) as [string, ...string[]]).nullish(),
+            type: z
+              .enum(Object.values(NodeType) as [string, ...string[]])
+              .nullish(),
             position: z.object({ x: z.number(), y: z.number() }),
             data: z.record(z.string(), z.any()).optional(),
           })

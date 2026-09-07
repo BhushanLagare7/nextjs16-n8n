@@ -42,15 +42,13 @@ const formSchema = z.object({
   // .refine() TODO JSON5 — validate body as JSON5 once supported
 })
 
-export type FormType = z.infer<typeof formSchema>
+export type HttpRequestFormValues = z.infer<typeof formSchema>
 
 interface HttpRequestDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSubmit: (values: z.infer<typeof formSchema>) => void
-  defaultEndpoint?: string
-  defaultMethod?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"
-  defaultBody?: string
+  defaultValues?: Partial<HttpRequestFormValues>
 }
 
 /**
@@ -61,16 +59,14 @@ export function HttpRequestDialog({
   open,
   onOpenChange,
   onSubmit,
-  defaultEndpoint = "",
-  defaultMethod = "GET",
-  defaultBody = "",
+  defaultValues = {},
 }: HttpRequestDialogProps) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      endpoint: defaultEndpoint,
-      method: defaultMethod,
-      body: defaultBody,
+      endpoint: defaultValues.endpoint ?? "",
+      method: defaultValues.method ?? "GET",
+      body: defaultValues.body ?? "",
     },
   })
 
@@ -78,12 +74,12 @@ export function HttpRequestDialog({
   useEffect(() => {
     if (open) {
       form.reset({
-        endpoint: defaultEndpoint,
-        method: defaultMethod,
-        body: defaultBody,
+        endpoint: defaultValues.endpoint ?? "",
+        method: defaultValues.method ?? "GET",
+        body: defaultValues.body ?? "",
       })
     }
-  }, [open, defaultEndpoint, defaultMethod, defaultBody, form])
+  }, [open, defaultValues, form])
 
   // Only show the body field for methods that typically carry a payload
   const watchMethod = form.watch("method")
@@ -114,10 +110,7 @@ export function HttpRequestDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Method</FormLabel>
-                  <Select
-                    value={field.value}
-                    onValueChange={field.onChange}
-                  >
+                  <Select value={field.value} onValueChange={field.onChange}>
                     <FormControl>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select a method" />
