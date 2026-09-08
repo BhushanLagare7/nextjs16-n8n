@@ -113,7 +113,7 @@ export function HttpRequestDialog({
   }, [open, defaultValues, form])
 
   // Live-watched values drive dynamic UI (preview text + conditional field)
-  const watchVariableName = form.watch("variableName") ?? "myApiCall"
+  const watchVariableName = form.watch("variableName") || "myApiCall"
   const watchMethod = form.watch("method")
 
   // Only show the body field for methods that typically carry a payload
