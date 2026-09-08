@@ -9,18 +9,26 @@ import { BaseExecutionNode } from "../base-execution-node"
 
 import { HttpRequestDialog, HttpRequestFormValues } from "./dialog"
 
-/** User-configured data stored on an HTTP Request node */
+/**
+ * User-configured data stored on an HTTP Request node.
+ * Mirrors the fields exposed in {@link HttpRequestDialog}.
+ */
 type HttpRequestNodeData = {
+  variableName?: string
   endpoint?: string
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"
   body?: string
 }
 
+/** React Flow node type parameterized with our node's data shape. */
 type HttpRequestNodeType = Node<HttpRequestNodeData>
 
 /**
  * Execution node that performs an HTTP request.
- * Configuration lives in `data`; opening settings shows the config dialog.
+ *
+ * Configuration lives in `props.data`; double-clicking or opening
+ * settings shows the {@link HttpRequestDialog} to edit it. Rendering
+ * is memoized to avoid unnecessary re-renders as the graph changes.
  */
 export const HttpRequestNode = memo((props: NodeProps<HttpRequestNodeType>) => {
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -29,11 +37,12 @@ export const HttpRequestNode = memo((props: NodeProps<HttpRequestNodeType>) => {
   // TODO: derive from real execution status once wired up
   const nodeStatus = "initial"
 
+  /** Open the settings dialog. */
   const handleOpenSettings = () => {
     setDialogOpen(true)
   }
 
-  /** Persist dialog values back onto the node's `data` object */
+  /** Persist dialog values back onto this node's `data` object. */
   const handleSubmit = (values: HttpRequestFormValues) => {
     setNodes((nodes) =>
       nodes.map((node) => {
@@ -80,4 +89,5 @@ export const HttpRequestNode = memo((props: NodeProps<HttpRequestNodeType>) => {
   )
 })
 
+// Required for readable names in React DevTools when using memo
 HttpRequestNode.displayName = "HttpRequestNode"

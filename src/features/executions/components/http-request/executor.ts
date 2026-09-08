@@ -1,26 +1,56 @@
+import Handlebars from "handlebars"
 import { NonRetriableError } from "inngest"
 import ky, { type Options as KyOptions } from "ky"
 
 import type { NodeExecutor } from "@/features/executions/types"
 
-/** Configuration schema for an HTTP request node. */
+/** Custom Handlebars helper to stringify nested objects or variables as pretty JSON */
+Handlebars.registerHelper("json", (context) => {
+  const jsonString = JSON.stringify(context, null, 2)
+  const safeString = new Handlebars.SafeString(jsonString)
+
+  return safeString
+})
+
+/** URL-encode interpolated values for safe use inside endpoint URLs */
+Handlebars.registerHelper("encodeURI", (context) => {
+  return new Handlebars.SafeString(encodeURIComponent(String(context)))
+})
+
+/**
+ * Configuration schema for an HTTP request node.
+ *
+ * @property variableName Name under which the response is stored in context.
+ * @property endpoint     Target URL for the request (supports template strings).
+ * @property method       HTTP verb to use.
+ * @property body         Raw request body (supports template strings; POST/PUT/PATCH only).
+ */
 type HttpRequestData = {
-  endpoint?: string
-  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"
+  variableName: string
+  endpoint: string
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"
   body?: string
 }
 
 /**
  * Executor for HTTP request nodes.
- * Performs the request inside an Inngest step for durability
- * and merges the response into the workflow context under `httpResponse`.
+ *
+ * Resolves templated parameters (endpoint URL, request body) using Handlebars
+ * and the current execution context. Executes the HTTP call within an Inngest step,
+ * then maps the response to a custom variable in context.
+ *
+ * Throws {@link NonRetriableError} on configuration or payload syntax validation failures.
  */
-export const httpRequestExecutor: NodeExecutor<HttpRequestData> = async ({
-  data,
+export const httpRequestExecutor: NodeExecutor = async ({
+  data: rawData,
   nodeId,
   context,
   step,
 }) => {
+  // Narrow untyped node data from the DB into the expected shape.
+  // Fields are validated/defaulted below so persisted nodes stay compatible.
+  const data = rawData as Partial<HttpRequestData>
+
   // TODO: Publish "loading" state for http request
 
   // Endpoint is required; fail fast without retry if missing
@@ -29,16 +59,44 @@ export const httpRequestExecutor: NodeExecutor<HttpRequestData> = async ({
     throw new NonRetriableError("HTTP Request node: No endpoint configured")
   }
 
+  // Default missing/empty variableName for backward compatibility with
+  // persisted nodes that were saved before this field was required.
+  const variableName = data.variableName || "httpResponse"
+
+  // Default missing method for backward compatibility with legacy nodes
+  const method = data.method || "GET"
+
   // Wrap network call in step.run so Inngest can memoize and replay safely
   const result = await step.run("http-request", async () => {
-    const endpoint = data.endpoint!
-    const method = data.method || "GET"
+    // Interpolate variable templates in the endpoint URL.
+    // Uses {{{triple-stache}}} to prevent Handlebars HTML-escaping, and
+    // users can opt into URL-encoding via {{encodeURI varName}}.
+    const endpoint = Handlebars.compile(data.endpoint, { noEscape: true })(
+      context
+    )
 
     const options: KyOptions = { method }
 
-    // Only attach a body for methods that support one
+    // Only attach and parse a body for payload-carrying methods
     if (["POST", "PUT", "PATCH"].includes(method)) {
-      options.body = data.body
+      // Interpolate variable templates in the body payload.
+      // noEscape prevents Handlebars from HTML-encoding values inside JSON.
+      const resolved = Handlebars.compile(data.body || "{}", {
+        noEscape: true,
+      })(context)
+
+      // Enforce valid JSON structure before transmission
+      try {
+        JSON.parse(resolved)
+      } catch (error) {
+        throw new NonRetriableError(
+          `HTTP Request node: Malformed JSON body after template interpolation`,
+          { cause: error }
+        )
+      }
+
+      options.body = resolved
+      options.headers = { "Content-Type": "application/json" }
     }
 
     const response = await ky(endpoint, options)
@@ -49,13 +107,19 @@ export const httpRequestExecutor: NodeExecutor<HttpRequestData> = async ({
       ? await response.json()
       : await response.text()
 
-    return {
-      ...context,
+    // Normalized response layout for downstream templating engines
+    const responsePayload = {
       httpResponse: {
         status: response.status,
         statusText: response.statusText,
         data: responseData,
       },
+    }
+
+    // Assign payload directly under the configured variable key in context
+    return {
+      ...context,
+      [variableName]: responsePayload,
     }
   })
 
