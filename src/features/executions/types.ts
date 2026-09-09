@@ -1,4 +1,4 @@
-import type { GetStepTools, Inngest } from "inngest"
+import type { GetStepTools, Inngest, Realtime } from "inngest"
 
 /** Shared, mutable data passed between nodes during a workflow run. */
 export type WorkflowContext = Record<string, unknown>
@@ -19,7 +19,12 @@ export interface NodeExecutorParams<TData = Record<string, unknown>> {
   context: WorkflowContext
   /** Inngest step helpers for durable execution. */
   step: StepTools
-  // publish: TODO Add realtime later
+  /** Publishes a durable realtime message via step.realtime.publish. */
+  publish: <T>(
+    id: string,
+    topicRef: Realtime.TopicRef<T>,
+    data: T
+  ) => Promise<void>
 }
 
 /**
