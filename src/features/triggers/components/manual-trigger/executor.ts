@@ -20,14 +20,23 @@ export const manualTriggerExecutor: NodeExecutor<ManualTriggerData> = async ({
     { nodeId, status: "loading" }
   )
 
-  // Wrap in step.run so the trigger is recorded as a durable step
-  const result = await step.run("manual-trigger", async () => context)
+  try {
+    // Wrap in step.run so the trigger is recorded as a durable step
+    const result = await step.run("manual-trigger", async () => context)
 
-  await publish(
-    `manual-trigger-success-${nodeId}`,
-    manualTriggerChannel.status,
-    { nodeId, status: "success" }
-  )
+    await publish(
+      `manual-trigger-success-${nodeId}`,
+      manualTriggerChannel.status,
+      { nodeId, status: "success" }
+    )
 
-  return result
+    return result
+  } catch (error) {
+    await publish(
+      `manual-trigger-error-${nodeId}`,
+      manualTriggerChannel.status,
+      { nodeId, status: "error" }
+    )
+    throw error
+  }
 }
