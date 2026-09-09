@@ -67,7 +67,7 @@ export const BaseExecutionNode = memo(
         onSettings={onSettings}
       >
         <NodeStatusIndicator status={status} variant="border">
-          <BaseNode onDoubleClick={onDoubleClick}>
+          <BaseNode status={status} onDoubleClick={onDoubleClick}>
             <BaseNodeContent>
               {/* Icon can be either a Lucide component or a remote image URL */}
               {typeof Icon === "string" ? (

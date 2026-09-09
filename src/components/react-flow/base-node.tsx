@@ -1,49 +1,74 @@
 import { type ComponentProps, forwardRef } from "react"
 
-import { CheckCircle2Icon, Loader2Icon, XCircleIcon } from "lucide-react"
-
 import { cn } from "@/lib/utils"
 
-import { type NodeStatus } from "./node-status-indicator"
+import {
+  type NodeStatus,
+  NodeStatusBadge,
+  useNodeStatusContext,
+} from "./node-status-indicator"
 
 interface BaseNodeProps extends ComponentProps<"div"> {
-  /** Current execution status; drives the corner status icon */
+  /** Current execution status; drives the node border, glow, and corner badge */
   status?: NodeStatus
 }
 
 /**
+ * Status-driven border, ring, and subtle glow classes.
+ * Carefully tailored for high visibility and contrast across light and dark mode.
+ */
+const statusStyles: Record<NodeStatus, string> = {
+  initial: cn(
+    "border-border transition-colors hover:border-muted-foreground/60",
+    // Selected styles: applied by React Flow adding `.selected` to the ancestor node wrapper
+    "in-[.selected]:border-primary in-[.selected]:ring-2 in-[.selected]:ring-primary/20",
+    "[.react-flow\\_\\_node.selected_&]:border-primary [.react-flow\\_\\_node.selected_&]:ring-2 [.react-flow\\_\\_node.selected_&]:ring-primary/20"
+  ),
+  loading: cn(
+    "border-blue-500/80 dark:border-sky-400/80",
+    "ring-2 ring-blue-500/30 dark:ring-sky-400/35",
+    "shadow-[0_0_12px_rgba(59,130,246,0.25)] dark:shadow-[0_0_16px_rgba(56,189,248,0.3)]",
+    "animate-pulse"
+  ),
+  success: cn(
+    "border-emerald-600/90 dark:border-emerald-400/90",
+    "ring-2 ring-emerald-500/25 dark:ring-emerald-400/30",
+    "shadow-[0_0_10px_rgba(16,185,129,0.2)] dark:shadow-[0_0_14px_rgba(52,211,153,0.25)]"
+  ),
+  error: cn(
+    "border-rose-600/90 dark:border-rose-400/90",
+    "ring-2 ring-rose-500/25 dark:ring-rose-400/30",
+    "shadow-[0_0_10px_rgba(225,29,72,0.2)] dark:shadow-[0_0_14px_rgba(244,63,94,0.25)]"
+  ),
+}
+
+/**
  * Root container for custom workflow nodes.
- * Provides card styling, hover ring, and selected states driven by React Flow wrapper classes.
+ * Provides card styling, hover ring, and status states driven by realtime execution status.
  *
- * A tiny status icon is rendered in the bottom-right corner based on `status`.
+ * A polished status badge is rendered at the bottom-right corner when active.
  */
 export const BaseNode = forwardRef<HTMLDivElement, BaseNodeProps>(
-  ({ className, status, ...props }, ref) => (
-    <div
-      ref={ref}
-      className={cn(
-        "relative rounded-sm border border-muted-foreground bg-card text-card-foreground hover:bg-accent",
-        // Selected styles: applied by React Flow adding `.selected` to the ancestor node wrapper
-        "in-[.selected]:border-muted-foreground in-[.selected]:shadow-lg",
-        "[.react-flow\\_\\_node.selected_&]:border-muted-foreground [.react-flow\\_\\_node.selected_&]:shadow-lg",
-        className
-      )}
-      tabIndex={0}
-      {...props}
-    >
-      {props.children}
-      {/* Status indicator icons rendered as small badges in the bottom-right */}
-      {status === "error" && (
-        <XCircleIcon className="absolute right-0.5 bottom-0.5 size-2 stroke-3 text-red-600 dark:text-red-400" />
-      )}
-      {status === "success" && (
-        <CheckCircle2Icon className="absolute right-0.5 bottom-0.5 size-2 stroke-3 text-emerald-600 dark:text-emerald-400" />
-      )}
-      {status === "loading" && (
-        <Loader2Icon className="absolute -right-0.5 -bottom-0.5 size-2 animate-spin stroke-3 text-blue-600 dark:text-blue-400" />
-      )}
-    </div>
-  )
+  ({ className, status: statusProp, ...props }, ref) => {
+    const context = useNodeStatusContext()
+    const status = statusProp ?? context?.status ?? "initial"
+
+    return (
+      <div
+        ref={ref}
+        className={cn(
+          "relative rounded-md border bg-card text-card-foreground transition-all duration-200 hover:bg-accent",
+          statusStyles[status],
+          className
+        )}
+        tabIndex={0}
+        {...props}
+      >
+        {props.children}
+        <NodeStatusBadge status={status} />
+      </div>
+    )
+  }
 )
 BaseNode.displayName = "BaseNode"
 

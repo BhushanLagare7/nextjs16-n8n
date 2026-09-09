@@ -1,5 +1,5 @@
 // src/inngest/functions.ts
-import { NonRetriableError } from "inngest"
+import { NonRetriableError, type Realtime } from "inngest"
 
 import { NodeType } from "@/config/constants"
 import { getExecutor } from "@/features/executions/lib/executor-registry"
@@ -11,22 +11,35 @@ import { topologicalSort } from "./utils"
 /**
  * Inngest background function that runs a workflow end-to-end.
  *
- * Flow:
- *  1. Load the workflow with its nodes and connections.
- *  2. Topologically sort nodes to determine execution order.
- *  3. Execute nodes sequentially, threading a shared context between them.
+ * 1. Loads the workflow with its nodes and connections.
+ * 2. Topologically sorts nodes to determine execution order.
+ * 3. Executes nodes sequentially, threading a shared context between them.
  */
 export const executeWorkflow = inngest.createFunction(
-  { id: "execute-workflow", triggers: { event: "workflows/execute.workflow" } },
+  {
+    id: "execute-workflow",
+    retries: 0, // TODO: remove before production
+    triggers: [{ event: "workflows/execute.workflow" }],
+  },
   async ({ event, step }) => {
     const workflowId = event.data.workflowId
 
-    // Fail fast if the event payload is malformed
     if (!workflowId) {
       throw new NonRetriableError("Workflow ID is missing")
     }
 
-    // Step 1 & 2: Fetch workflow definition and compute execution order
+    /**
+     * Publishes a realtime message via `step.realtime.publish`, so executors
+     * don't need direct access to the step reference.
+     */
+    const publish = async <T>(
+      id: string,
+      topicRef: Realtime.TopicRef<T>,
+      data: T
+    ): Promise<void> => {
+      await step.realtime.publish(id, topicRef, data)
+    }
+
     const sortedNodes = await step.run("prepare-workflow", async () => {
       const workflow = await db.orm.public.Workflow.where({
         id: workflowId,
@@ -64,7 +77,7 @@ export const executeWorkflow = inngest.createFunction(
 
       const sorted = topologicalSort(workflow.nodes, workflow.connections)
 
-      // Return only serializable fields — Inngest persists step output as JSON
+      // Only serializable fields are returned — Inngest persists step output as JSON
       return sorted.map((node) => ({
         id: node.id,
         type: node.type,
@@ -72,10 +85,8 @@ export const executeWorkflow = inngest.createFunction(
       }))
     })
 
-    // Seed context with any data supplied by the triggering event
     let context = event.data.initialData ?? {}
 
-    // Step 3: Execute nodes in topological order, propagating context
     for (const node of sortedNodes) {
       const executor = getExecutor(node.type as NodeType)
       context = await executor({
@@ -83,6 +94,7 @@ export const executeWorkflow = inngest.createFunction(
         nodeId: node.id,
         context,
         step,
+        publish,
       })
     }
 
