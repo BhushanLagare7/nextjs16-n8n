@@ -35,14 +35,13 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 
 /**
- * Zod validation schema for the HTTP request settings form.
+ * Validation schema for the HTTP request settings form.
  *
- * Fields:
- * - `variableName`: Identifier used to reference this node's response in
- *   downstream nodes. Must be a valid JS identifier.
- * - `endpoint`: Target URL for the HTTP request.
+ * - `variableName`: identifier used to reference this node's response in
+ *   downstream nodes; must be a valid JS identifier.
+ * - `endpoint`: target URL for the request.
  * - `method`: HTTP verb to use.
- * - `body`: Optional request body (only meaningful for POST/PUT/PATCH).
+ * - `body`: optional payload, relevant only for POST/PUT/PATCH.
  */
 const formSchema = z.object({
   variableName: z
@@ -52,27 +51,20 @@ const formSchema = z.object({
       message:
         "Variable name must start with a letter or underscore and container only letters, numbers, and underscores",
     }),
-  endpoint: z.url({ message: "Please enter a valid URL" }),
+  endpoint: z.string().min(1, { message: "Please enter a valid URL" }),
   method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]),
   body: z.string().optional(),
-  // .refine() TODO JSON5 — validate body as JSON5 once supported
+  // NOTE: validate body as JSON5 once supported
 })
 
 /** Inferred form value type used by consumers of this dialog. */
 export type HttpRequestFormValues = z.infer<typeof formSchema>
 
-/**
- * Props for {@link HttpRequestDialog}.
- *
- * @property open           Controls dialog visibility.
- * @property onOpenChange   Callback invoked when open state changes.
- * @property onSubmit       Called with validated form values on save.
- * @property defaultValues  Initial values to pre-fill the form.
- */
 interface HttpRequestDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSubmit: (values: z.infer<typeof formSchema>) => void
+  /** Initial values to pre-fill the form. */
   defaultValues?: Partial<HttpRequestFormValues>
 }
 
@@ -89,7 +81,6 @@ export function HttpRequestDialog({
   onSubmit,
   defaultValues = {},
 }: HttpRequestDialogProps) {
-  // Initialize the form with Zod validation and default values
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -100,7 +91,7 @@ export function HttpRequestDialog({
     },
   })
 
-  // Reset form values when dialog reopens so stale edits don't persist
+  // Reset on reopen so stale edits from a previous session don't persist
   useEffect(() => {
     if (open) {
       form.reset({
@@ -112,14 +103,12 @@ export function HttpRequestDialog({
     }
   }, [open, defaultValues, form])
 
-  // Live-watched values drive dynamic UI (preview text + conditional field)
   const watchVariableName = form.watch("variableName") || "myApiCall"
   const watchMethod = form.watch("method")
 
-  // Only show the body field for methods that typically carry a payload
+  // Body is only meaningful for methods that carry a payload
   const showBodyField = ["POST", "PUT", "PATCH"].includes(watchMethod)
 
-  /** Forward validated values to the parent and close the dialog. */
   const handleSubmit = (values: z.infer<typeof formSchema>) => {
     onSubmit(values)
     onOpenChange(false)
@@ -127,7 +116,7 @@ export function HttpRequestDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle>HTTP Request</DialogTitle>
           <DialogDescription>
@@ -139,7 +128,6 @@ export function HttpRequestDialog({
             className="mt-4 space-y-8"
             onSubmit={form.handleSubmit(handleSubmit)}
           >
-            {/* Variable name — how other nodes reference this response */}
             <FormField
               control={form.control}
               name="variableName"
@@ -157,7 +145,6 @@ export function HttpRequestDialog({
                 </FormItem>
               )}
             />
-            {/* HTTP method selector */}
             <FormField
               control={form.control}
               name="method"
@@ -185,7 +172,6 @@ export function HttpRequestDialog({
                 </FormItem>
               )}
             />
-            {/* Endpoint URL — supports {{template}} substitutions */}
             <FormField
               control={form.control}
               name="endpoint"
@@ -206,7 +192,6 @@ export function HttpRequestDialog({
                 </FormItem>
               )}
             />
-            {/* Conditional body field — only for POST/PUT/PATCH */}
             {showBodyField && (
               <FormField
                 control={form.control}

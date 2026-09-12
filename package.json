@@ -15,7 +15,8 @@
     "test": "tsx --test src/**/*.test.ts",
     "contract:emit": "prisma contract emit",
     "inngest:dev": "inngest-cli dev",
-    "dev:all": "mprocs"
+    "ngrok:dev": "dotenv -- ngrok http --url=$NGROK_URL 3000",
+    "dev:all": "dotenv -- mprocs"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.46",
@@ -72,6 +73,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/toposort": "^2.0.7",
+    "dotenv-cli": "^11.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.3.3",
     "eslint-plugin-simple-import-sort": "^14.0.0",

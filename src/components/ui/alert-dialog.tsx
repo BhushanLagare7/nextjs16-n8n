@@ -53,20 +53,35 @@ function AlertDialogOverlay({
   )
 }
 
-/** Centered dialog panel. Supports "default" and "sm" sizes */
+const alertDialogSizes = {
+  sm: "sm:max-w-sm",
+  default: "sm:max-w-md md:max-w-lg",
+  md: "sm:max-w-md",
+  lg: "sm:max-w-lg md:max-w-xl",
+  xl: "sm:max-w-xl md:max-w-2xl",
+} as const
+
+type AlertDialogSize = keyof typeof alertDialogSizes
+
+interface AlertDialogContentProps extends React.ComponentProps<
+  typeof AlertDialogPrimitive.Content
+> {
+  size?: AlertDialogSize
+}
+
+/** Centered dialog panel. Supports size variants ("default", "sm", "md", "lg", "xl") */
 function AlertDialogContent({
   className,
   size = "default",
   ...props
-}: React.ComponentProps<typeof AlertDialogPrimitive.Content> & {
-  size?: "default" | "sm"
-}) {
+}: AlertDialogContentProps) {
   return (
     <AlertDialogPortal>
       <AlertDialogOverlay />
       <AlertDialogPrimitive.Content
         className={cn(
-          "group/alert-dialog-content fixed top-1/2 left-1/2 z-50 grid w-full -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none data-[size=default]:max-w-xs data-[size=sm]:max-w-xs data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[size=default]:sm:max-w-sm",
+          "group/alert-dialog-content fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
+          alertDialogSizes[size] || alertDialogSizes.default,
           className
         )}
         data-size={size}
@@ -205,12 +220,14 @@ export {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
+  type AlertDialogContentProps,
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogMedia,
   AlertDialogOverlay,
   AlertDialogPortal,
+  type AlertDialogSize,
   AlertDialogTitle,
   AlertDialogTrigger,
 }

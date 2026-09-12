@@ -1,10 +1,12 @@
-# Process manager config: runs the Next.js app and the Inngest dev server side-by-side.
+# Runs the Next.js app alongside supporting dev services (Inngest, ngrok).
 procs:
-  # Local Inngest dev server for testing background functions.
+  ngrok:
+    cmd: ["npm", "run", "ngrok:dev"]
+
+  # Local Inngest dev server for background functions.
   inngest:
     cmd: ["npm", "run", "inngest:dev"]
 
-  # Next.js application dev server.
   next:
     cmd: ["npm", "run", "dev"]
     env:
