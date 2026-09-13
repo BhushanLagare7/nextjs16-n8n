@@ -4,7 +4,7 @@ import { generateSlug } from "random-word-slugs"
 import { z } from "zod"
 
 import { NodeType, PAGINATION } from "@/config/constants"
-import { inngest } from "@/inngest/client"
+import { sendWorkflowExecution } from "@/inngest/utils"
 import { db } from "@/prisma/db"
 import {
   createTRPCRouter,
@@ -34,9 +34,8 @@ export const workflowsRouter = createTRPCRouter({
         })
       }
 
-      await inngest.send({
-        name: "workflows/execute.workflow",
-        data: { workflowId: input.id },
+      await sendWorkflowExecution({
+        workflowId: input.id,
       })
 
       return workflow

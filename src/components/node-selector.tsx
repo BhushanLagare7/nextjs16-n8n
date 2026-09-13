@@ -19,16 +19,16 @@ import {
   SheetTrigger,
 } from "./ui/sheet"
 
-/** A selectable entry in the node picker */
+/** A selectable entry in the node picker. */
 export type NodeTypeOption = {
   type: NodeType
   label: string
   description: string
-  /** Lucide icon component or an image URL */
+  /** Lucide icon component or an image URL. */
   icon: React.ComponentType<{ className?: string }> | string
 }
 
-/** Nodes that start a workflow */
+/** Nodes that start a workflow. */
 const triggerNodes: NodeTypeOption[] = [
   {
     type: NodeType.MANUAL_TRIGGER,
@@ -37,9 +37,15 @@ const triggerNodes: NodeTypeOption[] = [
       "Runs the flow on clicking a button. Good for getting started quickly",
     icon: MousePointerIcon,
   },
+  {
+    type: NodeType.GOOGLE_FORM_TRIGGER,
+    label: "Google Form",
+    description: "Runs the flow when a Google Form is submitted",
+    icon: "/logos/googleform.svg",
+  },
 ]
 
-/** Nodes that perform an action within a workflow */
+/** Nodes that perform an action within a workflow. */
 const executionNodes: NodeTypeOption[] = [
   {
     type: NodeType.HTTP_REQUEST,
@@ -52,7 +58,7 @@ const executionNodes: NodeTypeOption[] = [
 interface NodeSelectorProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  /** Element that opens the sheet when clicked */
+  /** Element that opens the sheet when clicked. */
   children: React.ReactNode
 }
 
@@ -87,7 +93,7 @@ export function NodeSelector({
           (node) => node.type === NodeType.INITIAL
         )
 
-        // Place near screen center with slight jitter so nodes don't stack
+        // Jitter avoids stacking multiple nodes at the exact same position
         const centerX = window.innerWidth / 2
         const centerY = window.innerHeight / 2
 
@@ -127,15 +133,15 @@ export function NodeSelector({
           </SheetDescription>
         </SheetHeader>
 
-        {/* Trigger nodes */}
         <div>
           {triggerNodes.map((nodeType) => {
             const Icon = nodeType.icon
 
             return (
-              <div
+              <button
                 key={nodeType.type}
                 className="h-auto w-full cursor-pointer justify-start rounded-none border-l-2 border-transparent px-4 py-5 hover:border-l-primary"
+                type="button"
                 onClick={() => handleNodeSelect(nodeType)}
               >
                 <div className="flex w-full items-center gap-6 overflow-hidden">
@@ -157,22 +163,22 @@ export function NodeSelector({
                     </span>
                   </div>
                 </div>
-              </div>
+              </button>
             )
           })}
         </div>
 
         <Separator />
 
-        {/* Execution nodes */}
         <div>
           {executionNodes.map((nodeType) => {
             const Icon = nodeType.icon
 
             return (
-              <div
+              <button
                 key={nodeType.type}
                 className="h-auto w-full cursor-pointer justify-start rounded-none border-l-2 border-transparent px-4 py-5 hover:border-l-primary"
+                type="button"
                 onClick={() => handleNodeSelect(nodeType)}
               >
                 <div className="flex w-full items-center gap-6 overflow-hidden">
@@ -194,7 +200,7 @@ export function NodeSelector({
                     </span>
                   </div>
                 </div>
-              </div>
+              </button>
             )
           })}
         </div>

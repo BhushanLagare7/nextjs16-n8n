@@ -2,11 +2,30 @@
 
 import * as React from "react"
 
-import { cn } from "cn"
 import { XIcon } from "lucide-react"
 import { Dialog as DialogPrimitive } from "radix-ui"
 
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
+
+const dialogSizes = {
+  sm: "sm:max-w-sm",
+  md: "sm:max-w-md",
+  default: "sm:max-w-lg md:max-w-xl",
+  lg: "sm:max-w-xl md:max-w-2xl",
+  xl: "sm:max-w-2xl md:max-w-3xl",
+  "2xl": "sm:max-w-3xl md:max-w-5xl",
+  full: "sm:max-w-[calc(100%-4rem)]",
+} as const
+
+type DialogSize = keyof typeof dialogSizes
+
+interface DialogContentProps extends React.ComponentProps<
+  typeof DialogPrimitive.Content
+> {
+  showCloseButton?: boolean
+  size?: DialogSize
+}
 
 /**
  * Root dialog container. Manages open/close state.
@@ -60,23 +79,25 @@ function DialogOverlay({
  * Centered dialog panel. Automatically includes the portal and overlay.
  *
  * @param showCloseButton - Renders an "X" button in the top-right corner. Defaults to `true`.
+ * @param size - Max-width variant. Defaults to `"default"` (`sm:max-w-lg md:max-w-xl`, ~512-576px).
  */
 function DialogContent({
   className,
   children,
   showCloseButton = true,
+  size = "default",
   ...props
-}: React.ComponentProps<typeof DialogPrimitive.Content> & {
-  showCloseButton?: boolean
-}) {
+}: DialogContentProps) {
   return (
     <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Content
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-sm",
+          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
+          dialogSizes[size] || dialogSizes.default,
           className
         )}
+        data-size={size}
         data-slot="dialog-content"
         {...props}
       >
@@ -179,11 +200,13 @@ export {
   Dialog,
   DialogClose,
   DialogContent,
+  type DialogContentProps,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogOverlay,
   DialogPortal,
+  type DialogSize,
   DialogTitle,
   DialogTrigger,
 }
