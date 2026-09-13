@@ -17,4 +17,18 @@ describe("generateGoogleFormScript", () => {
     )
     assert(script.includes("formTitle: e.source.getTitle()"))
   })
+
+  it("handles duplicate question titles without overwriting", () => {
+    const script = generateGoogleFormScript("https://example.com")
+
+    // The script should track title occurrences and append a suffix
+    assert(
+      script.includes("titleCount"),
+      "Script should use a titleCount tracker for deduplication"
+    )
+    assert(
+      script.includes("title + '_' + titleCount[title]"),
+      "Script should append a numeric suffix for duplicate titles"
+    )
+  })
 })

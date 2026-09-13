@@ -2,6 +2,10 @@
  * Generates a Google Apps Script that forwards form submissions to the
  * given webhook URL, for use with a form's "On form submit" trigger.
  *
+ * Responses are keyed by question title. When multiple questions share the
+ * same title a numeric suffix is appended (e.g. "Rating", "Rating_2",
+ * "Rating_3") so no answer is silently overwritten.
+ *
  * @param webhookUrl - Endpoint that receives the submission payload.
  * @returns Apps Script source as a string.
  */
@@ -12,9 +16,18 @@ export const generateGoogleFormScript = (
   var itemResponses = formResponse.getItemResponses();
 
   var responses = {};
+  var titleCount = {};
   for (var i = 0; i < itemResponses.length; i++) {
     var itemResponse = itemResponses[i];
-    responses[itemResponse.getItem().getTitle()] = itemResponse.getResponse();
+    var title = itemResponse.getItem().getTitle();
+
+    if (titleCount[title] === undefined) {
+      titleCount[title] = 1;
+      responses[title] = itemResponse.getResponse();
+    } else {
+      titleCount[title]++;
+      responses[title + '_' + titleCount[title]] = itemResponse.getResponse();
+    }
   }
 
   var payload = {

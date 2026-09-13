@@ -9,7 +9,7 @@ import { sendWorkflowExecution } from "@/inngest/utils"
  *
  * @param request - Expects a `workflowId` query param and a JSON body
  * containing the form submission payload.
- * @returns 200 on success, 400 for missing params, 500 on failure.
+ * @returns 200 on success, 400 for missing params or malformed body, 500 on failure.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -26,16 +26,43 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const body = await request.json()
+    let body: unknown
+    try {
+      body = await request.json()
+    } catch {
+      return NextResponse.json(
+        { success: false, error: "Malformed JSON body" },
+        { status: 400 }
+      )
+    }
+
+    if (!body || typeof body !== "object") {
+      return NextResponse.json(
+        { success: false, error: "Request body must be a JSON object" },
+        { status: 400 }
+      )
+    }
+
+    const parsed = body as Record<string, unknown>
+
+    if (!parsed.formId || !parsed.responseId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Missing required fields: formId, responseId",
+        },
+        { status: 400 }
+      )
+    }
 
     const formData = {
-      formId: body.formId,
-      formTitle: body.formTitle,
-      responseId: body.responseId,
-      timestamp: body.timestamp,
-      respondentEmail: body.respondentEmail,
-      responses: body.responses,
-      raw: body,
+      formId: parsed.formId,
+      formTitle: parsed.formTitle,
+      responseId: parsed.responseId,
+      timestamp: parsed.timestamp,
+      respondentEmail: parsed.respondentEmail,
+      responses: parsed.responses,
+      raw: parsed,
     }
 
     await sendWorkflowExecution({

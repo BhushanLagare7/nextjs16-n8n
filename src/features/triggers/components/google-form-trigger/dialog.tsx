@@ -24,6 +24,26 @@ interface GoogleFormTriggerDialogProps {
 }
 
 /**
+ * Returns true when the URL is publicly reachable — i.e. not a localhost/
+ * private-loop address and not the empty fallback default.
+ */
+function isPublicUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url)
+    const host = parsed.hostname
+    return (
+      host !== "localhost" &&
+      host !== "127.0.0.1" &&
+      host !== "0.0.0.0" &&
+      !host.startsWith("[::") &&
+      host !== ""
+    )
+  } catch {
+    return false
+  }
+}
+
+/**
  * Configuration dialog for the Google Form trigger node.
  * Displays the workflow's webhook URL and a copyable Apps Script snippet
  * for wiring up "On form submit" notifications.
@@ -36,6 +56,7 @@ export function GoogleFormTriggerDialog({
   const workflowId = params?.workflowId as string
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+  const isBaseUrlPublic = isPublicUrl(baseUrl)
   const webhookUrl = `${baseUrl}/api/webhooks/google-form?workflowId=${workflowId}`
 
   const copyToClipboard = async () => {
@@ -68,6 +89,20 @@ export function GoogleFormTriggerDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
+          {!isBaseUrlPublic && (
+            <div className="rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-3 text-sm text-yellow-700 dark:text-yellow-400">
+              <p className="font-medium">Localhost URL detected</p>
+              <p className="mt-1 text-xs">
+                The current app URL ({baseUrl}) is not publicly reachable.
+                Google Forms cannot deliver submissions to localhost. Set{" "}
+                <code className="rounded bg-background px-1 py-0.5">
+                  NEXT_PUBLIC_APP_URL
+                </code>{" "}
+                to a public URL (e.g. your ngrok URL) before testing end-to-end.
+              </p>
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="webhook-url">Webhook URL</Label>
             <div className="flex gap-2">
@@ -78,6 +113,7 @@ export function GoogleFormTriggerDialog({
                 value={webhookUrl}
               />
               <Button
+                aria-label="Copy webhook URL"
                 size="icon"
                 type="button"
                 variant="outline"

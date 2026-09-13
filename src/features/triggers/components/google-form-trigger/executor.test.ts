@@ -86,4 +86,45 @@ describe("googleFormTriggerExecutor", () => {
       data: { nodeId: "node-2", status: "error" },
     })
   })
+
+  it("rethrows the original error even when publish fails during error handling", async () => {
+    const publishError = new Error("Publish failed")
+    let publishCallCount = 0
+    const publishMock = async <T>(
+      _id: string,
+      _topicRef: unknown,
+      _data: T
+    ) => {
+      publishCallCount++
+      // First call (loading) succeeds, second call (error status) throws
+      if (publishCallCount === 2) {
+        throw publishError
+      }
+    }
+
+    const originalError = new Error("Original step failure")
+    const stepMock: StepTools = {
+      run: (async (): Promise<never> => {
+        throw originalError
+      }) as StepTools["run"],
+    } as StepTools
+
+    await assert.rejects(
+      async () => {
+        await googleFormTriggerExecutor({
+          data: {},
+          nodeId: "node-3",
+          context: {},
+          step: stepMock,
+          publish: publishMock,
+        })
+      },
+      (err: unknown) => {
+        // Must rethrow the original error, not the publish error
+        assert.strictEqual(err, originalError)
+        assert.notStrictEqual(err, publishError)
+        return true
+      }
+    )
+  })
 })

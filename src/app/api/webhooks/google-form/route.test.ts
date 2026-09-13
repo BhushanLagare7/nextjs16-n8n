@@ -28,6 +28,62 @@ describe("POST /api/webhooks/google-form", () => {
     )
   })
 
+  it("returns 400 for malformed JSON body", async () => {
+    const req = new NextRequest(
+      "http://localhost:3000/api/webhooks/google-form?workflowId=wf-1",
+      {
+        method: "POST",
+        body: "not-json{{{",
+        headers: { "Content-Type": "application/json" },
+      }
+    )
+
+    const res = await POST(req)
+    assert.strictEqual(res.status, 400)
+
+    const json = await res.json()
+    assert.strictEqual(json.success, false)
+    assert.strictEqual(json.error, "Malformed JSON body")
+  })
+
+  it("returns 400 when body is null", async () => {
+    const req = new NextRequest(
+      "http://localhost:3000/api/webhooks/google-form?workflowId=wf-1",
+      {
+        method: "POST",
+        body: JSON.stringify(null),
+        headers: { "Content-Type": "application/json" },
+      }
+    )
+
+    const res = await POST(req)
+    assert.strictEqual(res.status, 400)
+
+    const json = await res.json()
+    assert.strictEqual(json.success, false)
+    assert.strictEqual(json.error, "Request body must be a JSON object")
+  })
+
+  it("returns 400 when required fields are missing", async () => {
+    const req = new NextRequest(
+      "http://localhost:3000/api/webhooks/google-form?workflowId=wf-1",
+      {
+        method: "POST",
+        body: JSON.stringify({ formTitle: "Some form" }),
+      }
+    )
+
+    const res = await POST(req)
+    assert.strictEqual(res.status, 400)
+
+    const json = await res.json()
+    assert.strictEqual(json.success, false)
+    assert.strictEqual(
+      json.error,
+      "Missing required fields: formId, responseId"
+    )
+  })
+
   it("dispatches inngest event with googleForm data and returns 200 on valid submission", async (t) => {
     const inngestSendMock = t.mock.method(inngest, "send", async () => ({
       ids: ["evt_test_123"],

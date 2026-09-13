@@ -29,11 +29,18 @@ export const googleFormTriggerExecutor: NodeExecutor<
 
     return result
   } catch (error) {
-    await publish(
-      `google-form-trigger-error-${nodeId}`,
-      googleFormTriggerChannel.status,
-      { nodeId, status: "error" }
-    )
+    try {
+      await publish(
+        `google-form-trigger-error-${nodeId}`,
+        googleFormTriggerChannel.status,
+        { nodeId, status: "error" }
+      )
+    } catch (publishError) {
+      console.error(
+        "Failed to publish error status for google-form-trigger:",
+        publishError
+      )
+    }
     throw error
   }
 }

@@ -138,9 +138,10 @@ export function NodeSelector({
             const Icon = nodeType.icon
 
             return (
-              <div
+              <button
                 key={nodeType.type}
                 className="h-auto w-full cursor-pointer justify-start rounded-none border-l-2 border-transparent px-4 py-5 hover:border-l-primary"
+                type="button"
                 onClick={() => handleNodeSelect(nodeType)}
               >
                 <div className="flex w-full items-center gap-6 overflow-hidden">
@@ -162,7 +163,7 @@ export function NodeSelector({
                     </span>
                   </div>
                 </div>
-              </div>
+              </button>
             )
           })}
         </div>
@@ -174,9 +175,10 @@ export function NodeSelector({
             const Icon = nodeType.icon
 
             return (
-              <div
+              <button
                 key={nodeType.type}
                 className="h-auto w-full cursor-pointer justify-start rounded-none border-l-2 border-transparent px-4 py-5 hover:border-l-primary"
+                type="button"
                 onClick={() => handleNodeSelect(nodeType)}
               >
                 <div className="flex w-full items-center gap-6 overflow-hidden">
@@ -198,7 +200,7 @@ export function NodeSelector({
                     </span>
                   </div>
                 </div>
-              </div>
+              </button>
             )
           })}
         </div>
