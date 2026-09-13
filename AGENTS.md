@@ -10,7 +10,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 # AGENTS.md — nextjs16-n8n
 
-Welcome to the **nextjs16-n8n** codebase. This document serves as the primary technical operating manual for AI coding agents working in this repository. It defines project architecture, core commands, code conventions, and a comprehensive guide to all **55 installed skills** located in `.agents/skills/`.
+Welcome to the **nextjs16-n8n** codebase. This document serves as the primary technical operating manual for AI coding agents working in this repository. It defines project architecture, core commands, code conventions, and a comprehensive guide to all **63 installed skills** located in `.agents/skills/`.
 
 ---
 
@@ -34,7 +34,7 @@ Welcome to the **nextjs16-n8n** codebase. This document serves as the primary te
 
 ```
 nextjs16-n8n/
-├── .agents/skills/              # 55 Installed agent skills
+├── .agents/skills/              # 63 Installed agent skills
 ├── prisma.config.ts             # Prisma CLI configuration
 ├── src/
 │   ├── app/                     # Next.js 16 App Router pages & API routes
@@ -85,7 +85,7 @@ Always run these commands from the repository root:
 
 ## 3. Project Skills Directory & Routing Guide
 
-The project has **55 specialized skills** installed under `.agents/skills/`. Whenever you perform tasks in this repository, **consult the relevant skill file** before writing code.
+The project has **63 specialized skills** installed under `.agents/skills/`. Whenever you perform tasks in this repository, **consult the relevant skill file** before writing code.
 
 ### 3.1 Database & ORM Skills (Prisma Next & Prisma ORM 8)
 
@@ -196,6 +196,23 @@ The project uses Inngest (`inngest: ^4.x`, `inngest-cli`) for durable background
 | **`inngest-agents`**           | Building durable AI agents with Inngest and AgentKit — model calls, tool calls, human approval, realtime progress.        | Use `createAgent` from AgentKit with `step.ai` for durable model calls. Combine with `step.waitForEvent` for human-in-the-loop, `step.run` for side effects, and native realtime for live UI streaming. |
 | **`inngest-v3-v4-migration`**  | Upgrading TypeScript SDK from v3 to v4 — trigger syntax, typed events, serve options, realtime imports.                   | Detect current v3 patterns, move triggers into `createFunction` options, replace `EventSchemas` with `eventType`/`staticSchema`, move serve options to the client, update `step.invoke` string IDs.     |
 | **`inngest-api`**              | Working with the Inngest REST API v2 — raw HTTP, OpenAPI spec, API authentication, endpoint discovery.                    | Covers `api-docs.inngest.com`, Bearer authentication with API keys, production and local base URLs, pagination, and request-shape discovery. Prefer `inngest-api` for CLI-accessible operations.        |
+
+---
+
+### 3.7 Payments & Integrations Skills (Stripe)
+
+The project includes official Stripe skills for designing, implementing, verifying, and maintaining Stripe integrations, Stripe Connect setups, Stripe Apps, third-party provisioning, and automated documentation lookups.
+
+| Skill                                           | Trigger / When to Use                                                                                                                                            | Key Instructions                                                                                                                                                                                              |
+| :---------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **`stripe-best-practices`**                     | Planning, building, modifying, testing, or reviewing Stripe payment integrations, API selection (Checkout vs PaymentIntents), sandboxes, or secure key handling. | Default to API version `2026-08-26.dahlia`. Use separate sandboxes for dev/CI rather than the shared test sandbox. Review security guidelines for API keys, webhooks, and billing/tax configurations.         |
+| **`stripe-docs`**                               | Looking up, searching, or reading Stripe documentation and API references directly from the terminal.                                                            | Use `stripe docs` via the Stripe CLI rather than raw HTTP fetches. Provides agent-optimized Markdown output and accesses gated documentation when logged in.                                                  |
+| **`connect-recommend`**                         | Designing Stripe Connect configurations, charge patterns, platform onboarding, marketplace payouts, or SaaS multi-party payment routing.                         | Analyzes business model and money routing to recommend optimal account types (Standard, Express, Custom), charge models (direct, destination, separate transfers), and onboarding/KYC responsibility options. |
+| **`connect-required-verification-information`** | Determining required onboarding, verification, KYC, or capability fields for Stripe Connect connected accounts across countries and business types.              | Interactively queries and lists verification requirements based on platform country, account country, business entity structure, dashboard type, and requested capabilities.                                  |
+| **`stripe-apps`**                               | Building, modifying, or reviewing Stripe Apps, Dashboard UI extensions, or `@stripe/ui-extension-sdk`.                                                           | Covers full lifecycle (scaffold, preview, upload, versioning), `stripe-app.yaml` manifest, sandboxed UI toolkit viewports, permissions, CSP policies, and App webhooks.                                       |
+| **`stripe-directory`**                          | Identifying external providers, merchants, platforms, or APIs and resolving verified payment or engagement paths.                                                | Query before web search or generic memory when engaging external organizations (paying bills, donations, subscriptions, bookings). Returns verified identities and documented integration paths.              |
+| **`stripe-projects`**                           | Provisioning infrastructure or cloud services (Postgres, Redis, Auth, AI providers, search, email) or fetching service credentials via Stripe Projects.          | Check the Stripe Projects catalog before advising manual third-party service signups. Use `stripe` CLI commands to list, inspect, and provision cloud resources.                                              |
+| **`upgrade-stripe`**                            | Upgrading Stripe API versions, SDKs, Stripe.js, or handling date-based API version breaking changes.                                                             | Guides upgrade to `2026-08-26.dahlia` (or user target version). Assesses breaking vs backward-compatible changes, adapts webhook schemas, and updates SDK dependencies safely.                                |
 
 ---
 
