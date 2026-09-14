@@ -37,24 +37,27 @@ export function createEmptyStepMock(): StepTools {
 
 export const createStepMock = createEmptyStepMock
 
-export interface AiWrapSuccessStepMock {
+export interface AiWrapSuccessStepMock<TOptions = Record<string, unknown>> {
   stepMock: StepTools
   getWrapStepName: () => string
   readonly wrapStepName: string
+  getWrapOptions: () => TOptions | undefined
 }
 
 /**
  * Creates a StepTools mock configured for a successful `step.ai.wrap` execution.
  * Tracks the step name passed to `wrap` and returns the provided response text.
  */
-export function createAiWrapSuccessStepMock(
+export function createAiWrapSuccessStepMock<TOptions = Record<string, unknown>>(
   responseText: string
-): AiWrapSuccessStepMock {
+): AiWrapSuccessStepMock<TOptions> {
   let wrapStepName = ""
+  let wrapOptions: TOptions | undefined
   const stepMock = {
     ai: {
-      wrap: async (stepName: string) => {
+      wrap: async (stepName: string, _fn?: unknown, options?: TOptions) => {
         wrapStepName = stepName
+        wrapOptions = options
         return {
           text: responseText,
           steps: [
@@ -73,6 +76,7 @@ export function createAiWrapSuccessStepMock(
     get wrapStepName() {
       return wrapStepName
     },
+    getWrapOptions: () => wrapOptions,
   }
 }
 

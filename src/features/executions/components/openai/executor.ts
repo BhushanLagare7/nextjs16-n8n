@@ -57,11 +57,6 @@ export const openAiExecutor: NodeExecutor<OpenAiData> = async ({
 
   // TODO: Throw if credential is missing
 
-  const systemPrompt = data.systemPrompt
-    ? Handlebars.compile(data.systemPrompt)(context)
-    : "You are a helpful assistant."
-  const userPrompt = Handlebars.compile(data.userPrompt)(context)
-
   // TODO: Fetch credential that user selected
 
   const credentialValue = process.env.OPENAI_API_KEY!
@@ -71,6 +66,13 @@ export const openAiExecutor: NodeExecutor<OpenAiData> = async ({
   })
 
   try {
+    const systemPrompt = data.systemPrompt
+      ? Handlebars.compile(data.systemPrompt, { noEscape: true })(context)
+      : "You are a helpful assistant."
+    const userPrompt = Handlebars.compile(data.userPrompt, {
+      noEscape: true,
+    })(context)
+
     const { steps, text: directText } = await step.ai.wrap(
       "openai-generate-text",
       generateText,

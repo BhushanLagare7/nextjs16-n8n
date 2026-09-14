@@ -59,11 +59,6 @@ export const anthropicExecutor: NodeExecutor<AnthropicData> = async ({
 
   // TODO: Throw if credential is missing
 
-  const systemPrompt = data.systemPrompt
-    ? Handlebars.compile(data.systemPrompt)(context)
-    : "You are a helpful assistant."
-  const userPrompt = Handlebars.compile(data.userPrompt)(context)
-
   // TODO: Fetch credential that user selected
 
   const credentialValue = process.env.ANTHROPIC_API_KEY!
@@ -73,6 +68,13 @@ export const anthropicExecutor: NodeExecutor<AnthropicData> = async ({
   })
 
   try {
+    const systemPrompt = data.systemPrompt
+      ? Handlebars.compile(data.systemPrompt, { noEscape: true })(context)
+      : "You are a helpful assistant."
+    const userPrompt = Handlebars.compile(data.userPrompt, {
+      noEscape: true,
+    })(context)
+
     const { steps, text: directText } = await step.ai.wrap(
       "anthropic-generate-text",
       generateText,

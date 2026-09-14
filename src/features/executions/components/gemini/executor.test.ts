@@ -150,4 +150,71 @@ describe("geminiExecutor", () => {
       data: { nodeId: "node-fail", status: "error" },
     })
   })
+
+  it("compiles prompts without HTML escaping (noEscape: true)", async () => {
+    process.env.GOOGLE_GENERATIVE_AI_API_KEY = "test-gemini-key"
+
+    const { publishMock } = createPublishMock()
+    const { stepMock, getWrapOptions } = createAiWrapSuccessStepMock<{
+      instructions?: string
+      prompt?: string
+    }>("Gemini response")
+
+    await geminiExecutor({
+      data: {
+        variableName: "aiResult",
+        systemPrompt: "Instructions with {{specialSys}}",
+        userPrompt: "Prompt with {{specialUser}}",
+      },
+      nodeId: "node-no-escape",
+      context: {
+        specialSys: "<b>&'\"</b>",
+        specialUser: "1 < 2 && 3 > 2",
+      },
+      step: stepMock,
+      publish: publishMock,
+    })
+
+    const options = getWrapOptions()
+    assert.strictEqual(options?.instructions, "Instructions with <b>&'\"</b>")
+    assert.strictEqual(options?.prompt, "Prompt with 1 < 2 && 3 > 2")
+  })
+
+  it("publishes error status and re-throws when prompt contains invalid Handlebars syntax", async () => {
+    process.env.GOOGLE_GENERATIVE_AI_API_KEY = "test-gemini-key"
+
+    const { published, publishMock } = createPublishMock()
+    const stepMock = createEmptyStepMock()
+
+    await assert.rejects(
+      async () => {
+        await geminiExecutor({
+          data: {
+            variableName: "aiResult",
+            userPrompt: "Hello {{unclosed",
+          },
+          nodeId: "node-syntax-error",
+          context: {},
+          step: stepMock,
+          publish: publishMock,
+        })
+      },
+      (err: unknown) => {
+        assert(err instanceof Error)
+        return true
+      }
+    )
+
+    assert.strictEqual(published.length, 2)
+    assert.deepStrictEqual(published[0], {
+      id: "gemini-loading-node-syntax-error",
+      topicRef: geminiChannel.status,
+      data: { nodeId: "node-syntax-error", status: "loading" },
+    })
+    assert.deepStrictEqual(published[1], {
+      id: "gemini-error-node-syntax-error",
+      topicRef: geminiChannel.status,
+      data: { nodeId: "node-syntax-error", status: "error" },
+    })
+  })
 })

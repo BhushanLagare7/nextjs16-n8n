@@ -57,11 +57,6 @@ export const geminiExecutor: NodeExecutor<GeminiData> = async ({
 
   // TODO: Throw if credential is missing
 
-  const systemPrompt = data.systemPrompt
-    ? Handlebars.compile(data.systemPrompt)(context)
-    : "You are a helpful assistant."
-  const userPrompt = Handlebars.compile(data.userPrompt)(context)
-
   // TODO: Fetch credential that user selected
 
   const credentialValue = process.env.GOOGLE_GENERATIVE_AI_API_KEY!
@@ -71,11 +66,18 @@ export const geminiExecutor: NodeExecutor<GeminiData> = async ({
   })
 
   try {
+    const systemPrompt = data.systemPrompt
+      ? Handlebars.compile(data.systemPrompt, { noEscape: true })(context)
+      : "You are a helpful assistant."
+    const userPrompt = Handlebars.compile(data.userPrompt, {
+      noEscape: true,
+    })(context)
+
     const { steps, text: directText } = await step.ai.wrap(
       "gemini-generate-text",
       generateText,
       {
-        model: google("gemini-2.0-flash"),
+        model: google("gemini-2.5-flash"),
         instructions: systemPrompt,
         prompt: userPrompt,
         telemetry: {
