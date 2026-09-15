@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
-import { useForm } from "react-hook-form"
+import { useForm, useWatch } from "react-hook-form"
 
 import { zodResolver } from "@hookform/resolvers/zod"
 import z from "zod"
@@ -103,8 +103,17 @@ export function HttpRequestDialog({
     }
   }, [open, defaultValues, form])
 
-  const watchVariableName = form.watch("variableName") || "myApiCall"
-  const watchMethod = form.watch("method")
+  const watchVariableName =
+    useWatch({
+      control: form.control,
+      name: "variableName",
+      defaultValue: "myApiCall",
+    }) || "myApiCall"
+  const watchMethod = useWatch({
+    control: form.control,
+    name: "method",
+    defaultValue: "GET",
+  })
 
   // Body is only meaningful for methods that carry a payload
   const showBodyField = ["POST", "PUT", "PATCH"].includes(watchMethod)

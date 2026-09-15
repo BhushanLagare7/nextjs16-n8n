@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 
 import { sendWorkflowExecution } from "@/inngest/utils"
+import { db } from "@/prisma/db"
 
 /**
  * Webhook endpoint for Google Form submissions.
@@ -65,8 +66,22 @@ export async function POST(request: NextRequest) {
       raw: parsed,
     }
 
+    const workflow = await db.orm.public.Workflow.where({
+      id: workflowId,
+    })
+      .select("userId")
+      .first()
+
+    if (!workflow) {
+      return NextResponse.json(
+        { success: false, error: "Workflow not found" },
+        { status: 404 }
+      )
+    }
+
     await sendWorkflowExecution({
       workflowId,
+      userId: workflow.userId,
       initialData: {
         googleForm: formData,
       },

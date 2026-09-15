@@ -65,6 +65,7 @@ export const topologicalSort = (
  */
 export const sendWorkflowExecution = async (data: {
   workflowId: string
+  userId: string
   initialData?: Record<string, unknown>
   [key: string]: unknown
 }) => {
