@@ -3,6 +3,7 @@ import { generateText } from "ai"
 import Handlebars from "handlebars"
 import { NonRetriableError } from "inngest"
 
+import { CredentialType } from "@/config/constants"
 import type { NodeExecutor } from "@/features/executions/types"
 import { geminiChannel } from "@/inngest/channels/gemini"
 import { db } from "@/prisma/db"
@@ -32,6 +33,7 @@ type GeminiData = {
 export const geminiExecutor: NodeExecutor<GeminiData> = async ({
   data,
   nodeId,
+  userId,
   context,
   step,
   publish,
@@ -69,10 +71,17 @@ export const geminiExecutor: NodeExecutor<GeminiData> = async ({
   const credential = await step.run("get-credential", () => {
     return db.orm.public.Credential.where({
       id: data.credentialId,
+      type: CredentialType.GEMINI,
+      ...(userId ? { userId } : {}),
     }).first()
   })
 
   if (!credential) {
+    await publish(
+      `gemini-error-no-credential-found-${nodeId}`,
+      geminiChannel.status,
+      { nodeId, status: "error" }
+    )
     throw new NonRetriableError("Gemini node: Credential not found")
   }
 

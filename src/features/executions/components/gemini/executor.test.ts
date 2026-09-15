@@ -2,7 +2,9 @@ import { NonRetriableError } from "inngest"
 import assert from "node:assert"
 import { describe, it } from "node:test"
 
+import type { StepTools } from "@/features/executions/types"
 import { geminiChannel } from "@/inngest/channels/gemini"
+import { db } from "@/prisma/db"
 
 import {
   createAiWrapErrorStepMock,
@@ -242,5 +244,87 @@ describe("geminiExecutor", () => {
       topicRef: geminiChannel.status,
       data: { nodeId: "node-syntax-error", status: "error" },
     })
+  })
+
+  it("publishes error status and throws NonRetriableError when credential is not found in DB", async () => {
+    const { published, publishMock } = createPublishMock()
+    const stepMock = {
+      run: async (name: string, fn: () => unknown) => {
+        if (name === "get-credential") return null
+        return fn()
+      },
+    } as unknown as StepTools
+
+    await assert.rejects(
+      async () => {
+        await geminiExecutor({
+          data: {
+            variableName: "aiResult",
+            credentialId: "cred-missing",
+            userPrompt: "Hello",
+          },
+          nodeId: "node-no-cred",
+          context: {},
+          step: stepMock,
+          publish: publishMock,
+        })
+      },
+      (err: unknown) => {
+        assert(err instanceof NonRetriableError)
+        assert.strictEqual(err.message, "Gemini node: Credential not found")
+        return true
+      }
+    )
+
+    assert.strictEqual(published.length, 2)
+    assert.deepStrictEqual(published[0], {
+      id: "gemini-loading-node-no-cred",
+      topicRef: geminiChannel.status,
+      data: { nodeId: "node-no-cred", status: "loading" },
+    })
+    assert.deepStrictEqual(published[1], {
+      id: "gemini-error-no-credential-found-node-no-cred",
+      topicRef: geminiChannel.status,
+      data: { nodeId: "node-no-cred", status: "error" },
+    })
+  })
+
+  it("passes userId to credential query when provided", async (t) => {
+    const { publishMock } = createPublishMock()
+
+    const stepMock = {
+      run: async (_name: string, fn: () => unknown) => fn(),
+      ai: {
+        wrap: async () => ({
+          text: "response",
+          steps: [{ content: [{ type: "text", text: "response" }] }],
+        }),
+      },
+    } as unknown as StepTools
+
+    const whereMock = t.mock.method(db.orm.public.Credential, "where", () => ({
+      first: async () => ({ id: "cred-1", value: "key-123" }),
+    }))
+
+    await geminiExecutor({
+      data: {
+        variableName: "aiResult",
+        credentialId: "cred-1",
+        userPrompt: "Hello",
+      },
+      nodeId: "node-user",
+      userId: "user-789",
+      context: {},
+      step: stepMock,
+      publish: publishMock,
+    })
+
+    assert.strictEqual(whereMock.mock.calls.length, 1)
+    const callArg = whereMock.mock.calls[0]?.arguments[0] as Record<
+      string,
+      unknown
+    >
+    assert.strictEqual(callArg.userId, "user-789")
+    assert.strictEqual(callArg.type, "GEMINI")
   })
 })

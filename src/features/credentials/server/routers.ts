@@ -33,7 +33,7 @@ export const credentialsRouter = createTRPCRouter({
         name,
         userId: ctx.auth.user.id,
         type,
-        value, // TODO: Consider encrypting in production
+        value,
       })
     }),
 
@@ -77,7 +77,7 @@ export const credentialsRouter = createTRPCRouter({
       }).update({
         name,
         type,
-        value, // TODO: Consider encrypting in production
+        value,
       })
 
       if (!credential) {
@@ -134,6 +134,7 @@ export const credentialsRouter = createTRPCRouter({
 
       const [items, total] = await Promise.all([
         query
+          .select("id", "name", "type", "createdAt", "updatedAt")
           .orderBy((c) => c.updatedAt.desc())
           .offset((page - 1) * pageSize)
           .limit(pageSize)
@@ -176,6 +177,7 @@ export const credentialsRouter = createTRPCRouter({
         c.userId.eq(ctx.auth.user.id)
       )
         .where((c) => c.type.eq(type))
+        .select("id", "name", "type", "createdAt", "updatedAt")
         .orderBy((c) => c.updatedAt.desc())
         .all()
     }),

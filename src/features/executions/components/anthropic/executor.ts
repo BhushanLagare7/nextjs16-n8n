@@ -3,6 +3,7 @@ import { generateText } from "ai"
 import Handlebars from "handlebars"
 import { NonRetriableError } from "inngest"
 
+import { CredentialType } from "@/config/constants"
 import type { NodeExecutor } from "@/features/executions/types"
 import { anthropicChannel } from "@/inngest/channels/anthropic"
 import { db } from "@/prisma/db"
@@ -32,6 +33,7 @@ type AnthropicData = {
 export const anthropicExecutor: NodeExecutor<AnthropicData> = async ({
   data,
   nodeId,
+  userId,
   context,
   step,
   publish,
@@ -71,10 +73,17 @@ export const anthropicExecutor: NodeExecutor<AnthropicData> = async ({
   const credential = await step.run("get-credential", () => {
     return db.orm.public.Credential.where({
       id: data.credentialId,
+      type: CredentialType.ANTHROPIC,
+      ...(userId ? { userId } : {}),
     }).first()
   })
 
   if (!credential) {
+    await publish(
+      `anthropic-error-no-credential-found-${nodeId}`,
+      anthropicChannel.status,
+      { nodeId, status: "error" }
+    )
     throw new NonRetriableError("Anthropic node: Credential not found")
   }
 

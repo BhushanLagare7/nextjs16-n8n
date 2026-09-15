@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 
 import { sendWorkflowExecution } from "@/inngest/utils"
+import { db } from "@/prisma/db"
 
 /**
  * Webhook endpoint for Stripe events.
@@ -61,9 +62,23 @@ export async function POST(request: NextRequest) {
         rawObject?.customer ?? rawObject?.customer_id ?? rawObject?.customerId,
     }
 
+    const workflow = await db.orm.public.Workflow.where({
+      id: workflowId,
+    })
+      .select("userId")
+      .first()
+
+    if (!workflow) {
+      return NextResponse.json(
+        { success: false, error: "Workflow not found" },
+        { status: 404 }
+      )
+    }
+
     // Trigger an Inngest job
     await sendWorkflowExecution({
       workflowId,
+      userId: workflow.userId,
       initialData: {
         stripe: stripeData,
       },

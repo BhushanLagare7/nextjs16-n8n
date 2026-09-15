@@ -3,6 +3,7 @@ import { generateText } from "ai"
 import Handlebars from "handlebars"
 import { NonRetriableError } from "inngest"
 
+import { CredentialType } from "@/config/constants"
 import type { NodeExecutor } from "@/features/executions/types"
 import { openAiChannel } from "@/inngest/channels/openai"
 import { db } from "@/prisma/db"
@@ -32,6 +33,7 @@ type OpenAiData = {
 export const openAiExecutor: NodeExecutor<OpenAiData> = async ({
   data,
   nodeId,
+  userId,
   context,
   step,
   publish,
@@ -69,10 +71,17 @@ export const openAiExecutor: NodeExecutor<OpenAiData> = async ({
   const credential = await step.run("get-credential", () => {
     return db.orm.public.Credential.where({
       id: data.credentialId,
+      type: CredentialType.OPENAI,
+      ...(userId ? { userId } : {}),
     }).first()
   })
 
   if (!credential) {
+    await publish(
+      `openai-error-no-credential-found-${nodeId}`,
+      openAiChannel.status,
+      { nodeId, status: "error" }
+    )
     throw new NonRetriableError("OpenAI node: Credential not found")
   }
 
