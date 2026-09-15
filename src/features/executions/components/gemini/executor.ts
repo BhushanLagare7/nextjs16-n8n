@@ -5,6 +5,7 @@ import { NonRetriableError } from "inngest"
 
 import type { NodeExecutor } from "@/features/executions/types"
 import { geminiChannel } from "@/inngest/channels/gemini"
+import { db } from "@/prisma/db"
 
 /** Stringifies a value for use inside Handlebars templates: `{{json value}}`. */
 Handlebars.registerHelper("json", (context) => {
@@ -14,6 +15,7 @@ Handlebars.registerHelper("json", (context) => {
 
 type GeminiData = {
   variableName?: string
+  credentialId?: string
   systemPrompt?: string
   userPrompt?: string
 }
@@ -25,7 +27,7 @@ type GeminiData = {
  * Handlebars, calls Gemini, and returns the context extended with the
  * generated text under `data.variableName`.
  *
- * @throws {NonRetriableError} If `variableName` or `userPrompt` is missing.
+ * @throws {NonRetriableError} If `variableName`, `credentialId`, or `userPrompt` is missing.
  */
 export const geminiExecutor: NodeExecutor<GeminiData> = async ({
   data,
@@ -47,6 +49,15 @@ export const geminiExecutor: NodeExecutor<GeminiData> = async ({
     throw new NonRetriableError("Gemini node: Variable name is missing")
   }
 
+  if (!data.credentialId) {
+    await publish(
+      `gemini-error-no-credential-${nodeId}`,
+      geminiChannel.status,
+      { nodeId, status: "error" }
+    )
+    throw new NonRetriableError("Gemini node: Credential is required")
+  }
+
   if (!data.userPrompt) {
     await publish(`gemini-error-no-prompt-${nodeId}`, geminiChannel.status, {
       nodeId,
@@ -55,14 +66,18 @@ export const geminiExecutor: NodeExecutor<GeminiData> = async ({
     throw new NonRetriableError("Gemini node: User prompt is missing")
   }
 
-  // TODO: Throw if credential is missing
+  const credential = await step.run("get-credential", () => {
+    return db.orm.public.Credential.where({
+      id: data.credentialId,
+    }).first()
+  })
 
-  // TODO: Fetch credential that user selected
-
-  const credentialValue = process.env.GOOGLE_GENERATIVE_AI_API_KEY!
+  if (!credential) {
+    throw new NonRetriableError("Gemini node: Credential not found")
+  }
 
   const google = createGoogle({
-    apiKey: credentialValue,
+    apiKey: credential.value,
   })
 
   try {

@@ -9,6 +9,7 @@ import {
   createAiWrapSuccessStepMock,
   createEmptyStepMock,
   createPublishMock,
+  createStepWithCredentialMock,
 } from "../executor-test-helpers"
 
 import { anthropicExecutor } from "./executor"
@@ -21,7 +22,7 @@ describe("anthropicExecutor", () => {
     await assert.rejects(
       async () => {
         await anthropicExecutor({
-          data: { userPrompt: "Hello" },
+          data: { userPrompt: "Hello", credentialId: "cred-1" },
           nodeId: "node-1",
           context: {},
           step: stepMock,
@@ -51,6 +52,38 @@ describe("anthropicExecutor", () => {
     })
   })
 
+  it("publishes error and throws when credentialId is missing", async () => {
+    const { published, publishMock } = createPublishMock()
+    const stepMock = createEmptyStepMock()
+
+    await assert.rejects(
+      async () => {
+        await anthropicExecutor({
+          data: { variableName: "myAnthropic", userPrompt: "Hello" },
+          nodeId: "node-1",
+          context: {},
+          step: stepMock,
+          publish: publishMock,
+        })
+      },
+      (err: unknown) => {
+        assert(err instanceof NonRetriableError)
+        assert.strictEqual(
+          err.message,
+          "Anthropic node: Credential is required"
+        )
+        return true
+      }
+    )
+
+    assert.strictEqual(published.length, 2)
+    assert.deepStrictEqual(published[1], {
+      id: "anthropic-error-no-credential-node-1",
+      topicRef: anthropicChannel.status,
+      data: { nodeId: "node-1", status: "error" },
+    })
+  })
+
   it("publishes error and throws when userPrompt is missing", async () => {
     const { published, publishMock } = createPublishMock()
     const stepMock = createEmptyStepMock()
@@ -58,7 +91,7 @@ describe("anthropicExecutor", () => {
     await assert.rejects(
       async () => {
         await anthropicExecutor({
-          data: { variableName: "myAnthropic" },
+          data: { variableName: "myAnthropic", credentialId: "cred-1" },
           nodeId: "node-1",
           context: {},
           step: stepMock,
@@ -84,8 +117,6 @@ describe("anthropicExecutor", () => {
   })
 
   it("executes step.ai.wrap, publishes success, and returns context with text", async () => {
-    process.env.ANTHROPIC_API_KEY = "test-anthropic-key"
-
     const { published, publishMock } = createPublishMock()
     const { stepMock, getWrapStepName } = createAiWrapSuccessStepMock(
       "Anthropic generated response"
@@ -94,6 +125,7 @@ describe("anthropicExecutor", () => {
     const result = await anthropicExecutor({
       data: {
         variableName: "aiResult",
+        credentialId: "cred-1",
         systemPrompt: "You are an assistant.",
         userPrompt: "Hello {{name}}",
       },
@@ -124,8 +156,6 @@ describe("anthropicExecutor", () => {
   })
 
   it("publishes error status and re-throws when step.ai.wrap fails", async () => {
-    process.env.ANTHROPIC_API_KEY = "test-anthropic-key"
-
     const { published, publishMock } = createPublishMock()
     const testError = new Error("Anthropic API call failed")
     const stepMock = createAiWrapErrorStepMock(testError)
@@ -135,6 +165,7 @@ describe("anthropicExecutor", () => {
         await anthropicExecutor({
           data: {
             variableName: "aiResult",
+            credentialId: "cred-1",
             userPrompt: "Hello",
           },
           nodeId: "node-fail",
@@ -158,8 +189,6 @@ describe("anthropicExecutor", () => {
   })
 
   it("compiles prompts without HTML escaping (noEscape: true)", async () => {
-    process.env.ANTHROPIC_API_KEY = "test-anthropic-key"
-
     const { publishMock } = createPublishMock()
     const { stepMock, getWrapOptions } = createAiWrapSuccessStepMock<{
       instructions?: string
@@ -169,6 +198,7 @@ describe("anthropicExecutor", () => {
     await anthropicExecutor({
       data: {
         variableName: "aiResult",
+        credentialId: "cred-1",
         systemPrompt: "Instructions with {{specialSys}}",
         userPrompt: "Prompt with {{specialUser}}",
       },
@@ -187,16 +217,15 @@ describe("anthropicExecutor", () => {
   })
 
   it("publishes error status and re-throws when prompt contains invalid Handlebars syntax", async () => {
-    process.env.ANTHROPIC_API_KEY = "test-anthropic-key"
-
     const { published, publishMock } = createPublishMock()
-    const stepMock = createEmptyStepMock()
+    const stepMock = createStepWithCredentialMock()
 
     await assert.rejects(
       async () => {
         await anthropicExecutor({
           data: {
             variableName: "aiResult",
+            credentialId: "cred-1",
             userPrompt: "Hello {{unclosed",
           },
           nodeId: "node-syntax-error",

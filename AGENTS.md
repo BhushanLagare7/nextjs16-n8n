@@ -290,7 +290,30 @@ The project includes official Stripe skills for designing, implementing, verifyi
   ```
 - Always consult `node_modules/next/dist/docs/` when in doubt about App Router conventions, caching behavior, or Server Action rules.
 
-### 4.7 Quality Checks Before Committing
+### 4.7 React Hook Form & React Compiler (`useWatch` vs `form.watch`)
+
+- **Never use `form.watch()` directly in components**: Calling `form.watch()` triggers the React Compiler lint warning:
+  `Compilation Skipped: Use of incompatible library (react-hooks/incompatible-library)`
+  because `useForm()` returns mutable/subscription methods that break compiler memoization and can cause stale UI.
+- **Always use `useWatch` from `react-hook-form`**:
+  `useWatch` is an official custom React Hook conforming to the Rules of Hooks and standard React subscription primitives (`useSyncExternalStore`), allowing React Compiler to safely optimize the component.
+  ```tsx
+  import { useForm, useWatch } from "react-hook-form"
+
+  // Inside component:
+  const watchVariableName =
+    useWatch({
+      control: form.control,
+      name: "variableName",
+      defaultValue: "myDefaultValue",
+    }) || "myDefaultValue"
+  ```
+- **Gotcha — `defaultValue` vs Empty Strings (`""`)**:
+  - In `useWatch`, `defaultValue` only applies when the field value is `undefined`.
+  - When form values initialize with `""` (e.g., `variableName: defaultValues.variableName ?? ""`), `""` is defined, so `useWatch` returns `""` when the input is blank or cleared.
+  - To ensure fallback values remain visible when the input is empty, pair `useWatch` with the logical OR fallback: `useWatch({ ... }) || "myDefaultValue"`.
+
+### 4.8 Quality Checks Before Committing
 
 Always verify changes with the following suite:
 

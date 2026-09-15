@@ -9,6 +9,7 @@ import {
   createAiWrapSuccessStepMock,
   createEmptyStepMock,
   createPublishMock,
+  createStepWithCredentialMock,
 } from "../executor-test-helpers"
 
 import { geminiExecutor } from "./executor"
@@ -21,7 +22,7 @@ describe("geminiExecutor", () => {
     await assert.rejects(
       async () => {
         await geminiExecutor({
-          data: { userPrompt: "Hello" },
+          data: { userPrompt: "Hello", credentialId: "cred-1" },
           nodeId: "node-1",
           context: {},
           step: stepMock,
@@ -48,6 +49,35 @@ describe("geminiExecutor", () => {
     })
   })
 
+  it("publishes error and throws when credentialId is missing", async () => {
+    const { published, publishMock } = createPublishMock()
+    const stepMock = createEmptyStepMock()
+
+    await assert.rejects(
+      async () => {
+        await geminiExecutor({
+          data: { variableName: "myGemini", userPrompt: "Hello" },
+          nodeId: "node-1",
+          context: {},
+          step: stepMock,
+          publish: publishMock,
+        })
+      },
+      (err: unknown) => {
+        assert(err instanceof NonRetriableError)
+        assert.strictEqual(err.message, "Gemini node: Credential is required")
+        return true
+      }
+    )
+
+    assert.strictEqual(published.length, 2)
+    assert.deepStrictEqual(published[1], {
+      id: "gemini-error-no-credential-node-1",
+      topicRef: geminiChannel.status,
+      data: { nodeId: "node-1", status: "error" },
+    })
+  })
+
   it("publishes error and throws when userPrompt is missing", async () => {
     const { published, publishMock } = createPublishMock()
     const stepMock = createEmptyStepMock()
@@ -55,7 +85,7 @@ describe("geminiExecutor", () => {
     await assert.rejects(
       async () => {
         await geminiExecutor({
-          data: { variableName: "myGemini" },
+          data: { variableName: "myGemini", credentialId: "cred-1" },
           nodeId: "node-1",
           context: {},
           step: stepMock,
@@ -78,8 +108,6 @@ describe("geminiExecutor", () => {
   })
 
   it("executes step.ai.wrap, publishes success, and returns context with text", async () => {
-    process.env.GOOGLE_GENERATIVE_AI_API_KEY = "test-gemini-key"
-
     const { published, publishMock } = createPublishMock()
     const { stepMock, getWrapStepName } = createAiWrapSuccessStepMock(
       "Gemini generated response"
@@ -88,6 +116,7 @@ describe("geminiExecutor", () => {
     const result = await geminiExecutor({
       data: {
         variableName: "aiResult",
+        credentialId: "cred-1",
         systemPrompt: "You are an assistant.",
         userPrompt: "Translate {{text}}",
       },
@@ -118,8 +147,6 @@ describe("geminiExecutor", () => {
   })
 
   it("publishes error status and re-throws when step.ai.wrap fails", async () => {
-    process.env.GOOGLE_GENERATIVE_AI_API_KEY = "test-gemini-key"
-
     const { published, publishMock } = createPublishMock()
     const testError = new Error("Gemini API call failed")
     const stepMock = createAiWrapErrorStepMock(testError)
@@ -129,6 +156,7 @@ describe("geminiExecutor", () => {
         await geminiExecutor({
           data: {
             variableName: "aiResult",
+            credentialId: "cred-1",
             userPrompt: "Hello",
           },
           nodeId: "node-fail",
@@ -152,8 +180,6 @@ describe("geminiExecutor", () => {
   })
 
   it("compiles prompts without HTML escaping (noEscape: true)", async () => {
-    process.env.GOOGLE_GENERATIVE_AI_API_KEY = "test-gemini-key"
-
     const { publishMock } = createPublishMock()
     const { stepMock, getWrapOptions } = createAiWrapSuccessStepMock<{
       instructions?: string
@@ -163,6 +189,7 @@ describe("geminiExecutor", () => {
     await geminiExecutor({
       data: {
         variableName: "aiResult",
+        credentialId: "cred-1",
         systemPrompt: "Instructions with {{specialSys}}",
         userPrompt: "Prompt with {{specialUser}}",
       },
@@ -181,16 +208,15 @@ describe("geminiExecutor", () => {
   })
 
   it("publishes error status and re-throws when prompt contains invalid Handlebars syntax", async () => {
-    process.env.GOOGLE_GENERATIVE_AI_API_KEY = "test-gemini-key"
-
     const { published, publishMock } = createPublishMock()
-    const stepMock = createEmptyStepMock()
+    const stepMock = createStepWithCredentialMock()
 
     await assert.rejects(
       async () => {
         await geminiExecutor({
           data: {
             variableName: "aiResult",
+            credentialId: "cred-1",
             userPrompt: "Hello {{unclosed",
           },
           nodeId: "node-syntax-error",

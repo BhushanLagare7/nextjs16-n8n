@@ -5,6 +5,7 @@ import { NonRetriableError } from "inngest"
 
 import type { NodeExecutor } from "@/features/executions/types"
 import { anthropicChannel } from "@/inngest/channels/anthropic"
+import { db } from "@/prisma/db"
 
 /** Stringifies a value for use inside Handlebars templates: `{{json value}}`. */
 Handlebars.registerHelper("json", (context) => {
@@ -14,6 +15,7 @@ Handlebars.registerHelper("json", (context) => {
 
 type AnthropicData = {
   variableName?: string
+  credentialId?: string
   systemPrompt?: string
   userPrompt?: string
 }
@@ -25,7 +27,7 @@ type AnthropicData = {
  * Handlebars, calls Claude, and returns the context extended with the
  * generated text under `data.variableName`.
  *
- * @throws {NonRetriableError} If `variableName` or `userPrompt` is missing.
+ * @throws {NonRetriableError} If `variableName`, `credentialId`, or `userPrompt` is missing.
  */
 export const anthropicExecutor: NodeExecutor<AnthropicData> = async ({
   data,
@@ -48,6 +50,15 @@ export const anthropicExecutor: NodeExecutor<AnthropicData> = async ({
     throw new NonRetriableError("Anthropic node: Variable name is missing")
   }
 
+  if (!data.credentialId) {
+    await publish(
+      `anthropic-error-no-credential-${nodeId}`,
+      anthropicChannel.status,
+      { nodeId, status: "error" }
+    )
+    throw new NonRetriableError("Anthropic node: Credential is required")
+  }
+
   if (!data.userPrompt) {
     await publish(
       `anthropic-error-no-prompt-${nodeId}`,
@@ -57,14 +68,18 @@ export const anthropicExecutor: NodeExecutor<AnthropicData> = async ({
     throw new NonRetriableError("Anthropic node: User prompt is missing")
   }
 
-  // TODO: Throw if credential is missing
+  const credential = await step.run("get-credential", () => {
+    return db.orm.public.Credential.where({
+      id: data.credentialId,
+    }).first()
+  })
 
-  // TODO: Fetch credential that user selected
-
-  const credentialValue = process.env.ANTHROPIC_API_KEY!
+  if (!credential) {
+    throw new NonRetriableError("Anthropic node: Credential not found")
+  }
 
   const anthropic = createAnthropic({
-    apiKey: credentialValue,
+    apiKey: credential.value,
   })
 
   try {
