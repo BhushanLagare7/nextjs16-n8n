@@ -130,3 +130,25 @@ export function createAiWrapErrorStepMock(error: Error): StepTools {
     },
   } as unknown as StepTools
 }
+
+/**
+ * Creates a StepTools mock with `step.run` that directly executes the passed callback.
+ */
+export function createPassthroughStepMock(): StepTools {
+  return {
+    run: (async (_name: string, fn: () => unknown) => {
+      return fn()
+    }) as StepTools["run"],
+  } as unknown as StepTools
+}
+
+/**
+ * Creates a StepTools mock with `step.run` that throws the provided error.
+ */
+export function createFailingStepMock(error: Error): StepTools {
+  return {
+    run: (async () => {
+      throw error
+    }) as StepTools["run"],
+  } as unknown as StepTools
+}
