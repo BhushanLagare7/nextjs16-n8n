@@ -3,8 +3,10 @@ import { generateText } from "ai"
 import Handlebars from "handlebars"
 import { NonRetriableError } from "inngest"
 
+import { CredentialType } from "@/config/constants"
 import type { NodeExecutor } from "@/features/executions/types"
 import { openAiChannel } from "@/inngest/channels/openai"
+import { db } from "@/prisma/db"
 
 /** Stringifies a value for use inside Handlebars templates: `{{json value}}`. */
 Handlebars.registerHelper("json", (context) => {
@@ -14,6 +16,7 @@ Handlebars.registerHelper("json", (context) => {
 
 type OpenAiData = {
   variableName?: string
+  credentialId?: string
   systemPrompt?: string
   userPrompt?: string
 }
@@ -25,11 +28,12 @@ type OpenAiData = {
  * Handlebars, calls the OpenAI model, and returns the context extended with
  * the generated text under `data.variableName`.
  *
- * @throws {NonRetriableError} If `variableName` or `userPrompt` is missing.
+ * @throws {NonRetriableError} If `variableName`, `credentialId`, or `userPrompt` is missing.
  */
 export const openAiExecutor: NodeExecutor<OpenAiData> = async ({
   data,
   nodeId,
+  userId,
   context,
   step,
   publish,
@@ -47,6 +51,15 @@ export const openAiExecutor: NodeExecutor<OpenAiData> = async ({
     throw new NonRetriableError("OpenAi node: Variable name is missing")
   }
 
+  if (!data.credentialId) {
+    await publish(
+      `openai-error-no-credential-${nodeId}`,
+      openAiChannel.status,
+      { nodeId, status: "error" }
+    )
+    throw new NonRetriableError("OpenAI node: Credential is required")
+  }
+
   if (!data.userPrompt) {
     await publish(`openai-error-no-prompt-${nodeId}`, openAiChannel.status, {
       nodeId,
@@ -55,14 +68,25 @@ export const openAiExecutor: NodeExecutor<OpenAiData> = async ({
     throw new NonRetriableError("OpenAi node: User prompt is missing")
   }
 
-  // TODO: Throw if credential is missing
+  const credential = await step.run("get-credential", () => {
+    return db.orm.public.Credential.where({
+      id: data.credentialId,
+      type: CredentialType.OPENAI,
+      ...(userId ? { userId } : {}),
+    }).first()
+  })
 
-  // TODO: Fetch credential that user selected
-
-  const credentialValue = process.env.OPENAI_API_KEY!
+  if (!credential) {
+    await publish(
+      `openai-error-no-credential-found-${nodeId}`,
+      openAiChannel.status,
+      { nodeId, status: "error" }
+    )
+    throw new NonRetriableError("OpenAI node: Credential not found")
+  }
 
   const openai = createOpenAI({
-    apiKey: credentialValue,
+    apiKey: credential.value,
   })
 
   try {

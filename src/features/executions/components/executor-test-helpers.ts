@@ -37,6 +37,32 @@ export function createEmptyStepMock(): StepTools {
 
 export const createStepMock = createEmptyStepMock
 
+const defaultMockCredential = {
+  id: "test-credential-id",
+  name: "Test Credential",
+  value: "test-api-key",
+  type: "OPENAI",
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  userId: "user-1",
+}
+
+/**
+ * Creates a StepTools mock with `step.run` that returns a mock credential for `"get-credential"`.
+ */
+export function createStepWithCredentialMock(
+  credential = defaultMockCredential
+): StepTools {
+  return {
+    run: (async (name: string, fn: () => unknown) => {
+      if (name === "get-credential") {
+        return credential
+      }
+      return fn()
+    }) as StepTools["run"],
+  } as unknown as StepTools
+}
+
 export interface AiWrapSuccessStepMock<TOptions = Record<string, unknown>> {
   stepMock: StepTools
   getWrapStepName: () => string
@@ -54,6 +80,12 @@ export function createAiWrapSuccessStepMock<TOptions = Record<string, unknown>>(
   let wrapStepName = ""
   let wrapOptions: TOptions | undefined
   const stepMock = {
+    run: (async (name: string, fn: () => unknown) => {
+      if (name === "get-credential") {
+        return defaultMockCredential
+      }
+      return fn()
+    }) as StepTools["run"],
     ai: {
       wrap: async (stepName: string, _fn?: unknown, options?: TOptions) => {
         wrapStepName = stepName
@@ -85,6 +117,12 @@ export function createAiWrapSuccessStepMock<TOptions = Record<string, unknown>>(
  */
 export function createAiWrapErrorStepMock(error: Error): StepTools {
   return {
+    run: (async (name: string, fn: () => unknown) => {
+      if (name === "get-credential") {
+        return defaultMockCredential
+      }
+      return fn()
+    }) as StepTools["run"],
     ai: {
       wrap: async () => {
         throw error

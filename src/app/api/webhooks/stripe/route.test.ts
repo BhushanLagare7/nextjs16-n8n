@@ -3,7 +3,12 @@ import { NextRequest } from "next/server"
 import assert from "node:assert"
 import { describe, it } from "node:test"
 
-import { inngest } from "@/inngest/client"
+import {
+  mockInngestSend,
+  mockInngestSendFailure,
+  mockWorkflowFound,
+  mockWorkflowNotFound,
+} from "../route-test-helpers"
 
 import { POST } from "./route"
 
@@ -62,9 +67,8 @@ describe("POST /api/webhooks/stripe", () => {
   })
 
   it("dispatches inngest event with stripe data and returns 200 on valid webhook", async (t) => {
-    const inngestSendMock = t.mock.method(inngest, "send", async () => ({
-      ids: ["evt_test_123"],
-    }))
+    mockWorkflowFound(t, { userId: "user-stripe-owner" })
+    const inngestSendMock = mockInngestSend(t)
 
     const payload = {
       id: "evt_3Mkoq2LkdIwHu7ix0snNqP0",
@@ -100,6 +104,7 @@ describe("POST /api/webhooks/stripe", () => {
       name: "workflows/execute.workflow",
       data: {
         workflowId: "wf-stripe-1",
+        userId: "user-stripe-owner",
         initialData: {
           stripe: {
             eventId: "evt_3Mkoq2LkdIwHu7ix0snNqP0",
@@ -116,10 +121,32 @@ describe("POST /api/webhooks/stripe", () => {
     })
   })
 
+  it("returns 404 when workflow is not found", async (t) => {
+    mockWorkflowNotFound(t)
+
+    const req = new NextRequest(
+      "http://localhost:3000/api/webhooks/stripe?workflowId=wf-nonexistent",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          id: "evt_123",
+          type: "payment_intent.succeeded",
+          data: { object: {} },
+        }),
+      }
+    )
+
+    const res = await POST(req)
+    assert.strictEqual(res.status, 404)
+
+    const json = await res.json()
+    assert.strictEqual(json.success, false)
+    assert.strictEqual(json.error, "Workflow not found")
+  })
+
   it("returns 500 when dispatching execution throws an error", async (t) => {
-    t.mock.method(inngest, "send", async () => {
-      throw new Error("Inngest unavailable")
-    })
+    mockWorkflowFound(t, { userId: "user-stripe-owner" })
+    mockInngestSendFailure(t)
 
     const req = new NextRequest(
       "http://localhost:3000/api/webhooks/stripe?workflowId=wf-stripe-1",

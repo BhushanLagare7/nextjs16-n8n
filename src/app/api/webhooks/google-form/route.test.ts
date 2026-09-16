@@ -3,7 +3,12 @@ import { NextRequest } from "next/server"
 import assert from "node:assert"
 import { describe, it } from "node:test"
 
-import { inngest } from "@/inngest/client"
+import {
+  mockInngestSend,
+  mockInngestSendFailure,
+  mockWorkflowFound,
+  mockWorkflowNotFound,
+} from "../route-test-helpers"
 
 import { POST } from "./route"
 
@@ -85,9 +90,8 @@ describe("POST /api/webhooks/google-form", () => {
   })
 
   it("dispatches inngest event with googleForm data and returns 200 on valid submission", async (t) => {
-    const inngestSendMock = t.mock.method(inngest, "send", async () => ({
-      ids: ["evt_test_123"],
-    }))
+    mockWorkflowFound(t, { userId: "user-form-owner" })
+    const inngestSendMock = mockInngestSend(t)
 
     const payload = {
       formId: "form_abc",
@@ -119,6 +123,7 @@ describe("POST /api/webhooks/google-form", () => {
       name: "workflows/execute.workflow",
       data: {
         workflowId: "wf-999",
+        userId: "user-form-owner",
         initialData: {
           googleForm: {
             ...payload,
@@ -127,5 +132,50 @@ describe("POST /api/webhooks/google-form", () => {
         },
       },
     })
+  })
+
+  it("returns 404 when workflow is not found", async (t) => {
+    mockWorkflowNotFound(t)
+
+    const req = new NextRequest(
+      "http://localhost:3000/api/webhooks/google-form?workflowId=wf-nonexistent",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          formId: "form_abc",
+          responseId: "resp_xyz",
+        }),
+      }
+    )
+
+    const res = await POST(req)
+    assert.strictEqual(res.status, 404)
+
+    const json = await res.json()
+    assert.strictEqual(json.success, false)
+    assert.strictEqual(json.error, "Workflow not found")
+  })
+
+  it("returns 500 when dispatching execution throws an error", async (t) => {
+    mockWorkflowFound(t, { userId: "user-form-owner" })
+    mockInngestSendFailure(t)
+
+    const req = new NextRequest(
+      "http://localhost:3000/api/webhooks/google-form?workflowId=wf-999",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          formId: "form_abc",
+          responseId: "resp_xyz",
+        }),
+      }
+    )
+
+    const res = await POST(req)
+    assert.strictEqual(res.status, 500)
+
+    const json = await res.json()
+    assert.strictEqual(json.success, false)
+    assert.strictEqual(json.error, "Failed to process Google Form submission")
   })
 })

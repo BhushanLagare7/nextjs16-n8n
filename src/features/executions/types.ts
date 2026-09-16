@@ -15,6 +15,8 @@ export interface NodeExecutorParams<TData = Record<string, unknown>> {
   data: TData
   /** Unique identifier of the node being executed. */
   nodeId: string
+  /** ID of the user who owns the workflow, for scoping credential lookups. */
+  userId?: string
   /** Accumulated workflow context from previously executed nodes. */
   context: WorkflowContext
   /** Inngest step helpers for durable execution. */

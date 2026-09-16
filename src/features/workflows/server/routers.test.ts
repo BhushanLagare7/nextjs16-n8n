@@ -317,7 +317,7 @@ describe("workflowsRouter.execute", () => {
     assert.strictEqual(inngestSendMock.mock.calls.length, 1)
     assert.deepStrictEqual(inngestSendMock.mock.calls[0]?.arguments[0], {
       name: "workflows/execute.workflow",
-      data: { workflowId: "wf-1" },
+      data: { workflowId: "wf-1", userId: TEST_USER_ID },
     })
   })
 })

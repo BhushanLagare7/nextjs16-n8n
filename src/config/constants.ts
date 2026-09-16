@@ -30,3 +30,20 @@ export const NodeType = {
 
 /** Union of all node type string literals */
 export type NodeType = (typeof NodeType)[keyof typeof NodeType]
+
+/**
+ * Supported third-party AI credential providers matching the database schema in contract.prisma.
+ * `satisfies` ensures every value is a valid `Credential.type` at compile time.
+ */
+export const CredentialType = {
+  OPENAI: "OPENAI",
+  ANTHROPIC: "ANTHROPIC",
+  GEMINI: "GEMINI",
+} as const satisfies Record<
+  string,
+  FieldOutputTypes["public"]["Credential"]["type"]
+>
+
+/** Union of all credential type string literals */
+export type CredentialType =
+  (typeof CredentialType)[keyof typeof CredentialType]

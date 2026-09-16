@@ -2,13 +2,16 @@ import { NonRetriableError } from "inngest"
 import assert from "node:assert"
 import { describe, it } from "node:test"
 
+import type { StepTools } from "@/features/executions/types"
 import { openAiChannel } from "@/inngest/channels/openai"
+import { db } from "@/prisma/db"
 
 import {
   createAiWrapErrorStepMock,
   createAiWrapSuccessStepMock,
   createEmptyStepMock,
   createPublishMock,
+  createStepWithCredentialMock,
 } from "../executor-test-helpers"
 
 import { openAiExecutor } from "./executor"
@@ -21,7 +24,7 @@ describe("openAiExecutor", () => {
     await assert.rejects(
       async () => {
         await openAiExecutor({
-          data: { userPrompt: "Hello" },
+          data: { userPrompt: "Hello", credentialId: "cred-1" },
           nodeId: "node-1",
           context: {},
           step: stepMock,
@@ -48,6 +51,35 @@ describe("openAiExecutor", () => {
     })
   })
 
+  it("publishes error and throws when credentialId is missing", async () => {
+    const { published, publishMock } = createPublishMock()
+    const stepMock = createEmptyStepMock()
+
+    await assert.rejects(
+      async () => {
+        await openAiExecutor({
+          data: { variableName: "myOpenAi", userPrompt: "Hello" },
+          nodeId: "node-1",
+          context: {},
+          step: stepMock,
+          publish: publishMock,
+        })
+      },
+      (err: unknown) => {
+        assert(err instanceof NonRetriableError)
+        assert.strictEqual(err.message, "OpenAI node: Credential is required")
+        return true
+      }
+    )
+
+    assert.strictEqual(published.length, 2)
+    assert.deepStrictEqual(published[1], {
+      id: "openai-error-no-credential-node-1",
+      topicRef: openAiChannel.status,
+      data: { nodeId: "node-1", status: "error" },
+    })
+  })
+
   it("publishes error and throws when userPrompt is missing", async () => {
     const { published, publishMock } = createPublishMock()
     const stepMock = createEmptyStepMock()
@@ -55,7 +87,7 @@ describe("openAiExecutor", () => {
     await assert.rejects(
       async () => {
         await openAiExecutor({
-          data: { variableName: "myOpenAi" },
+          data: { variableName: "myOpenAi", credentialId: "cred-1" },
           nodeId: "node-1",
           context: {},
           step: stepMock,
@@ -78,8 +110,6 @@ describe("openAiExecutor", () => {
   })
 
   it("executes step.ai.wrap, publishes success, and returns context with text", async () => {
-    process.env.OPENAI_API_KEY = "test-openai-key"
-
     const { published, publishMock } = createPublishMock()
     const { stepMock, getWrapStepName } = createAiWrapSuccessStepMock(
       "OpenAI generated response"
@@ -88,6 +118,7 @@ describe("openAiExecutor", () => {
     const result = await openAiExecutor({
       data: {
         variableName: "aiResult",
+        credentialId: "cred-1",
         systemPrompt: "You are an assistant.",
         userPrompt: "Analyze {{data}}",
       },
@@ -118,8 +149,6 @@ describe("openAiExecutor", () => {
   })
 
   it("publishes error status and re-throws when step.ai.wrap fails", async () => {
-    process.env.OPENAI_API_KEY = "test-openai-key"
-
     const { published, publishMock } = createPublishMock()
     const testError = new Error("OpenAI API call failed")
     const stepMock = createAiWrapErrorStepMock(testError)
@@ -129,6 +158,7 @@ describe("openAiExecutor", () => {
         await openAiExecutor({
           data: {
             variableName: "aiResult",
+            credentialId: "cred-1",
             userPrompt: "Hello",
           },
           nodeId: "node-fail",
@@ -152,8 +182,6 @@ describe("openAiExecutor", () => {
   })
 
   it("compiles prompts without HTML escaping (noEscape: true)", async () => {
-    process.env.OPENAI_API_KEY = "test-openai-key"
-
     const { publishMock } = createPublishMock()
     const { stepMock, getWrapOptions } = createAiWrapSuccessStepMock<{
       instructions?: string
@@ -163,6 +191,7 @@ describe("openAiExecutor", () => {
     await openAiExecutor({
       data: {
         variableName: "aiResult",
+        credentialId: "cred-1",
         systemPrompt: "Instructions with {{specialSys}}",
         userPrompt: "Prompt with {{specialUser}}",
       },
@@ -181,16 +210,15 @@ describe("openAiExecutor", () => {
   })
 
   it("publishes error status and re-throws when prompt contains invalid Handlebars syntax", async () => {
-    process.env.OPENAI_API_KEY = "test-openai-key"
-
     const { published, publishMock } = createPublishMock()
-    const stepMock = createEmptyStepMock()
+    const stepMock = createStepWithCredentialMock()
 
     await assert.rejects(
       async () => {
         await openAiExecutor({
           data: {
             variableName: "aiResult",
+            credentialId: "cred-1",
             userPrompt: "Hello {{unclosed",
           },
           nodeId: "node-syntax-error",
@@ -216,5 +244,87 @@ describe("openAiExecutor", () => {
       topicRef: openAiChannel.status,
       data: { nodeId: "node-syntax-error", status: "error" },
     })
+  })
+
+  it("publishes error status and throws NonRetriableError when credential is not found in DB", async () => {
+    const { published, publishMock } = createPublishMock()
+    const stepMock = {
+      run: async (name: string, fn: () => unknown) => {
+        if (name === "get-credential") return null
+        return fn()
+      },
+    } as unknown as StepTools
+
+    await assert.rejects(
+      async () => {
+        await openAiExecutor({
+          data: {
+            variableName: "aiResult",
+            credentialId: "cred-missing",
+            userPrompt: "Hello",
+          },
+          nodeId: "node-no-cred",
+          context: {},
+          step: stepMock,
+          publish: publishMock,
+        })
+      },
+      (err: unknown) => {
+        assert(err instanceof NonRetriableError)
+        assert.strictEqual(err.message, "OpenAI node: Credential not found")
+        return true
+      }
+    )
+
+    assert.strictEqual(published.length, 2)
+    assert.deepStrictEqual(published[0], {
+      id: "openai-loading-node-no-cred",
+      topicRef: openAiChannel.status,
+      data: { nodeId: "node-no-cred", status: "loading" },
+    })
+    assert.deepStrictEqual(published[1], {
+      id: "openai-error-no-credential-found-node-no-cred",
+      topicRef: openAiChannel.status,
+      data: { nodeId: "node-no-cred", status: "error" },
+    })
+  })
+
+  it("passes userId to credential query when provided", async (t) => {
+    const { publishMock } = createPublishMock()
+
+    const stepMock = {
+      run: async (_name: string, fn: () => unknown) => fn(),
+      ai: {
+        wrap: async () => ({
+          text: "response",
+          steps: [{ content: [{ type: "text", text: "response" }] }],
+        }),
+      },
+    } as unknown as StepTools
+
+    const whereMock = t.mock.method(db.orm.public.Credential, "where", () => ({
+      first: async () => ({ id: "cred-1", value: "key-123" }),
+    }))
+
+    await openAiExecutor({
+      data: {
+        variableName: "aiResult",
+        credentialId: "cred-1",
+        userPrompt: "Hello",
+      },
+      nodeId: "node-user",
+      userId: "user-456",
+      context: {},
+      step: stepMock,
+      publish: publishMock,
+    })
+
+    assert.strictEqual(whereMock.mock.calls.length, 1)
+    const callArg = whereMock.mock.calls[0]?.arguments[0] as Record<
+      string,
+      unknown
+    >
+    assert.strictEqual(callArg.userId, "user-456")
+    assert.strictEqual(callArg.type, "OPENAI")
   })
 })

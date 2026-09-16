@@ -36,6 +36,7 @@ export const workflowsRouter = createTRPCRouter({
 
       await sendWorkflowExecution({
         workflowId: input.id,
+        userId: ctx.auth.user.id,
       })
 
       return workflow
