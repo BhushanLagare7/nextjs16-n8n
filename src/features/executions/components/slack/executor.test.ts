@@ -87,11 +87,15 @@ describe("slackExecutor", () => {
     })
   })
 
-  it("publishes error and throws NonRetriableError when variableName is missing inside step", async (t) => {
+  it("publishes error and throws NonRetriableError before step.run when variableName is missing", async (t) => {
     const { published, publishMock } = createPublishMock()
     const stepMock = createPassthroughStepMock()
 
-    t.mock.method(ky, "post", async () => ({}) as unknown as Response)
+    let kyPostCalled = false
+    t.mock.method(ky, "post", async () => {
+      kyPostCalled = true
+      return {} as unknown as Response
+    })
 
     await assert.rejects(
       async () => {
@@ -113,9 +117,81 @@ describe("slackExecutor", () => {
       }
     )
 
+    assert.strictEqual(kyPostCalled, false)
     assert.strictEqual(published.length, 3)
     assert.deepStrictEqual(published[1], {
       id: "slack-error-no-variable-node-1",
+      topicRef: slackChannel.status,
+      data: { nodeId: "node-1", status: "error" },
+    })
+  })
+
+  it("publishes error and throws NonRetriableError when webhookUrl is invalid", async () => {
+    const { published, publishMock } = createPublishMock()
+    const stepMock = createPassthroughStepMock()
+
+    await assert.rejects(
+      async () => {
+        await slackExecutor({
+          data: {
+            variableName: "mySlack",
+            content: "Hello Slack!",
+            webhookUrl: "http://evil.com/services/test",
+          },
+          nodeId: "node-1",
+          context: {},
+          step: stepMock,
+          publish: publishMock,
+        })
+      },
+      (err: unknown) => {
+        assert(err instanceof NonRetriableError)
+        assert(err.message.includes("Invalid webhook URL"))
+        return true
+      }
+    )
+
+    assert.strictEqual(published.length, 3)
+    assert.deepStrictEqual(published[1], {
+      id: "slack-error-invalid-webhook-node-1",
+      topicRef: slackChannel.status,
+      data: { nodeId: "node-1", status: "error" },
+    })
+  })
+
+  it("publishes error and throws NonRetriableError when template compilation fails", async () => {
+    const { published, publishMock } = createPublishMock()
+    const stepMock = createPassthroughStepMock()
+
+    await assert.rejects(
+      async () => {
+        await slackExecutor({
+          data: {
+            variableName: "mySlack",
+            content: "Malformed {{#if unclosed}",
+            webhookUrl: "https://hooks.slack.com/services/test",
+          },
+          nodeId: "node-1",
+          context: {},
+          step: stepMock,
+          publish: publishMock,
+        })
+      },
+      (err: unknown) => {
+        assert(err instanceof NonRetriableError)
+        assert(err.message.includes("Template rendering failed"))
+        return true
+      }
+    )
+
+    assert.strictEqual(published.length, 2)
+    assert.deepStrictEqual(published[0], {
+      id: "slack-loading-node-1",
+      topicRef: slackChannel.status,
+      data: { nodeId: "node-1", status: "loading" },
+    })
+    assert.deepStrictEqual(published[1], {
+      id: "slack-error-node-1",
       topicRef: slackChannel.status,
       data: { nodeId: "node-1", status: "error" },
     })
@@ -127,13 +203,15 @@ describe("slackExecutor", () => {
 
     let capturedUrl = ""
     let capturedBody: unknown
+    let capturedRedirect: string | undefined
 
     t.mock.method(
       ky,
       "post",
-      async (url: string, options: { json: unknown }) => {
+      async (url: string, options: { json: unknown; redirect?: string }) => {
         capturedUrl = url
         capturedBody = options.json
+        capturedRedirect = options.redirect
         return {} as unknown as Response
       }
     )
@@ -156,8 +234,9 @@ describe("slackExecutor", () => {
     })
 
     assert.strictEqual(capturedUrl, "https://hooks.slack.com/services/test-456")
+    assert.strictEqual(capturedRedirect, "error")
     assert.deepStrictEqual(capturedBody, {
-      content: 'Notification for Alice & Bob: {\n  "count": 100\n}',
+      text: 'Notification for Alice & Bob: {\n  "count": 100\n}',
     })
 
     assert.deepStrictEqual(result, {

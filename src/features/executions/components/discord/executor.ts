@@ -3,6 +3,7 @@ import { decode } from "html-entities"
 import { NonRetriableError } from "inngest"
 import ky from "ky"
 
+import { validateDiscordWebhookUrl } from "@/features/executions/lib/url-validation"
 import type { NodeExecutor } from "@/features/executions/types"
 import { discordChannel } from "@/inngest/channels/discord"
 
@@ -45,13 +46,35 @@ export const discordExecutor: NodeExecutor<DiscordData> = async ({
     throw new NonRetriableError("Discord node: Message content is required")
   }
 
-  const rawContent = Handlebars.compile(data.content)(context)
-  const content = decode(rawContent)
-  const username = data.username
-    ? decode(Handlebars.compile(data.username)(context))
-    : undefined
-
   try {
+    if (!data.variableName) {
+      await publish(
+        `discord-error-no-variable-${nodeId}`,
+        discordChannel.status,
+        {
+          nodeId,
+          status: "error",
+        }
+      )
+      throw new NonRetriableError("Discord node: Variable name is missing")
+    }
+    const variableName = data.variableName
+
+    let content: string
+    let username: string | undefined
+    try {
+      const rawContent = Handlebars.compile(data.content)(context)
+      content = decode(rawContent)
+      username = data.username
+        ? decode(Handlebars.compile(data.username)(context))
+        : undefined
+    } catch (error) {
+      throw new NonRetriableError(
+        `Discord node: Template rendering failed: ${error instanceof Error ? error.message : String(error)}`,
+        { cause: error }
+      )
+    }
+
     const result = await step.run("discord-webhook", async () => {
       if (!data.webhookUrl) {
         await publish(
@@ -65,28 +88,34 @@ export const discordExecutor: NodeExecutor<DiscordData> = async ({
         throw new NonRetriableError("Discord node: Webhook URL is required")
       }
 
-      await ky.post(data.webhookUrl, {
-        json: {
-          content: content.slice(0, 2000), // Discord's max message length
-          username,
-        },
-      })
-
-      if (!data.variableName) {
+      try {
+        validateDiscordWebhookUrl(data.webhookUrl)
+      } catch (error) {
         await publish(
-          `discord-error-no-variable-${nodeId}`,
+          `discord-error-invalid-webhook-${nodeId}`,
           discordChannel.status,
           {
             nodeId,
             status: "error",
           }
         )
-        throw new NonRetriableError("Discord node: Variable name is missing")
+        throw new NonRetriableError(
+          `Discord node: Invalid webhook URL: ${error instanceof Error ? error.message : String(error)}`,
+          { cause: error }
+        )
       }
+
+      await ky.post(data.webhookUrl, {
+        json: {
+          content: content.slice(0, 2000), // Discord's max message length
+          username,
+        },
+        redirect: "error",
+      })
 
       return {
         ...context,
-        [data.variableName]: {
+        [variableName]: {
           text: content.slice(0, 2000),
           messageContent: content.slice(0, 2000),
         },

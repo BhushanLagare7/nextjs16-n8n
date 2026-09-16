@@ -87,11 +87,15 @@ describe("discordExecutor", () => {
     })
   })
 
-  it("publishes error and throws NonRetriableError when variableName is missing inside step", async (t) => {
+  it("publishes error and throws NonRetriableError before step.run when variableName is missing", async (t) => {
     const { published, publishMock } = createPublishMock()
     const stepMock = createPassthroughStepMock()
 
-    t.mock.method(ky, "post", async () => ({}) as unknown as Response)
+    let kyPostCalled = false
+    t.mock.method(ky, "post", async () => {
+      kyPostCalled = true
+      return {} as unknown as Response
+    })
 
     await assert.rejects(
       async () => {
@@ -116,9 +120,81 @@ describe("discordExecutor", () => {
       }
     )
 
+    assert.strictEqual(kyPostCalled, false)
     assert.strictEqual(published.length, 3)
     assert.deepStrictEqual(published[1], {
       id: "discord-error-no-variable-node-1",
+      topicRef: discordChannel.status,
+      data: { nodeId: "node-1", status: "error" },
+    })
+  })
+
+  it("publishes error and throws NonRetriableError when webhookUrl is invalid", async () => {
+    const { published, publishMock } = createPublishMock()
+    const stepMock = createPassthroughStepMock()
+
+    await assert.rejects(
+      async () => {
+        await discordExecutor({
+          data: {
+            variableName: "myDiscord",
+            content: "Hello Discord!",
+            webhookUrl: "http://evil.com/webhook",
+          },
+          nodeId: "node-1",
+          context: {},
+          step: stepMock,
+          publish: publishMock,
+        })
+      },
+      (err: unknown) => {
+        assert(err instanceof NonRetriableError)
+        assert(err.message.includes("Invalid webhook URL"))
+        return true
+      }
+    )
+
+    assert.strictEqual(published.length, 3)
+    assert.deepStrictEqual(published[1], {
+      id: "discord-error-invalid-webhook-node-1",
+      topicRef: discordChannel.status,
+      data: { nodeId: "node-1", status: "error" },
+    })
+  })
+
+  it("publishes error and throws NonRetriableError when template compilation fails", async () => {
+    const { published, publishMock } = createPublishMock()
+    const stepMock = createPassthroughStepMock()
+
+    await assert.rejects(
+      async () => {
+        await discordExecutor({
+          data: {
+            variableName: "myDiscord",
+            content: "Malformed {{#if unclosed}",
+            webhookUrl: "https://discord.com/api/webhooks/test",
+          },
+          nodeId: "node-1",
+          context: {},
+          step: stepMock,
+          publish: publishMock,
+        })
+      },
+      (err: unknown) => {
+        assert(err instanceof NonRetriableError)
+        assert(err.message.includes("Template rendering failed"))
+        return true
+      }
+    )
+
+    assert.strictEqual(published.length, 2)
+    assert.deepStrictEqual(published[0], {
+      id: "discord-loading-node-1",
+      topicRef: discordChannel.status,
+      data: { nodeId: "node-1", status: "loading" },
+    })
+    assert.deepStrictEqual(published[1], {
+      id: "discord-error-node-1",
       topicRef: discordChannel.status,
       data: { nodeId: "node-1", status: "error" },
     })
@@ -130,13 +206,15 @@ describe("discordExecutor", () => {
 
     let capturedUrl = ""
     let capturedBody: unknown
+    let capturedRedirect: string | undefined
 
     t.mock.method(
       ky,
       "post",
-      async (url: string, options: { json: unknown }) => {
+      async (url: string, options: { json: unknown; redirect?: string }) => {
         capturedUrl = url
         capturedBody = options.json
+        capturedRedirect = options.redirect
         return {} as unknown as Response
       }
     )
@@ -160,6 +238,7 @@ describe("discordExecutor", () => {
     })
 
     assert.strictEqual(capturedUrl, "https://discord.com/api/webhooks/test-123")
+    assert.strictEqual(capturedRedirect, "error")
     assert.deepStrictEqual(capturedBody, {
       content: 'Alert for Alice & Bob: {\n  "count": 42\n}',
       username: "Bot for Alice & Bob",

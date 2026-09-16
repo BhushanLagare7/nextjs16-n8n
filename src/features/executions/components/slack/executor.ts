@@ -3,6 +3,7 @@ import { decode } from "html-entities"
 import { NonRetriableError } from "inngest"
 import ky from "ky"
 
+import { validateSlackWebhookUrl } from "@/features/executions/lib/url-validation"
 import type { NodeExecutor } from "@/features/executions/types"
 import { slackChannel } from "@/inngest/channels/slack"
 
@@ -44,10 +45,27 @@ export const slackExecutor: NodeExecutor<SlackData> = async ({
     throw new NonRetriableError("Slack node: Message content is required")
   }
 
-  const rawContent = Handlebars.compile(data.content)(context)
-  const content = decode(rawContent)
-
   try {
+    if (!data.variableName) {
+      await publish(`slack-error-no-variable-${nodeId}`, slackChannel.status, {
+        nodeId,
+        status: "error",
+      })
+      throw new NonRetriableError("Slack node: Variable name is missing")
+    }
+    const variableName = data.variableName
+
+    let content: string
+    try {
+      const rawContent = Handlebars.compile(data.content)(context)
+      content = decode(rawContent)
+    } catch (error) {
+      throw new NonRetriableError(
+        `Slack node: Template rendering failed: ${error instanceof Error ? error.message : String(error)}`,
+        { cause: error }
+      )
+    }
+
     const result = await step.run("slack-webhook", async () => {
       if (!data.webhookUrl) {
         await publish(`slack-error-no-webhook-${nodeId}`, slackChannel.status, {
@@ -57,27 +75,33 @@ export const slackExecutor: NodeExecutor<SlackData> = async ({
         throw new NonRetriableError("Slack node: Webhook URL is required")
       }
 
-      await ky.post(data.webhookUrl, {
-        json: {
-          content,
-        },
-      })
-
-      if (!data.variableName) {
+      try {
+        validateSlackWebhookUrl(data.webhookUrl)
+      } catch (error) {
         await publish(
-          `slack-error-no-variable-${nodeId}`,
+          `slack-error-invalid-webhook-${nodeId}`,
           slackChannel.status,
           {
             nodeId,
             status: "error",
           }
         )
-        throw new NonRetriableError("Slack node: Variable name is missing")
+        throw new NonRetriableError(
+          `Slack node: Invalid webhook URL: ${error instanceof Error ? error.message : String(error)}`,
+          { cause: error }
+        )
       }
+
+      await ky.post(data.webhookUrl, {
+        json: {
+          text: content,
+        },
+        redirect: "error",
+      })
 
       return {
         ...context,
-        [data.variableName]: {
+        [variableName]: {
           text: content.slice(0, 2000),
           messageContent: content.slice(0, 2000),
         },
