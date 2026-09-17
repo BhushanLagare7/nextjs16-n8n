@@ -119,19 +119,23 @@ describe("POST /api/webhooks/google-form", () => {
     assert.strictEqual(json.success, true)
 
     assert.strictEqual(inngestSendMock.mock.calls.length, 1)
-    assert.deepStrictEqual(inngestSendMock.mock.calls[0]?.arguments[0], {
-      name: "workflows/execute.workflow",
-      data: {
-        workflowId: "wf-999",
-        userId: "user-form-owner",
-        initialData: {
-          googleForm: {
-            ...payload,
-            raw: payload,
-          },
+    const callArg = inngestSendMock.mock.calls[0]?.arguments[0] as {
+      name: string
+      data: unknown
+      id: string
+    }
+    assert.strictEqual(callArg.name, "workflows/execute.workflow")
+    assert.deepStrictEqual(callArg.data, {
+      workflowId: "wf-999",
+      userId: "user-form-owner",
+      initialData: {
+        googleForm: {
+          ...payload,
+          raw: payload,
         },
       },
     })
+    assert.strictEqual(typeof callArg.id, "string")
   })
 
   it("returns 404 when workflow is not found", async (t) => {

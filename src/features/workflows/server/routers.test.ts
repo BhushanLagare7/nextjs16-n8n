@@ -315,10 +315,17 @@ describe("workflowsRouter.execute", () => {
       userId: TEST_USER_ID,
     })
     assert.strictEqual(inngestSendMock.mock.calls.length, 1)
-    assert.deepStrictEqual(inngestSendMock.mock.calls[0]?.arguments[0], {
-      name: "workflows/execute.workflow",
-      data: { workflowId: "wf-1", userId: TEST_USER_ID },
+    const callArg = inngestSendMock.mock.calls[0]?.arguments[0] as {
+      name: string
+      data: unknown
+      id: string
+    }
+    assert.strictEqual(callArg.name, "workflows/execute.workflow")
+    assert.deepStrictEqual(callArg.data, {
+      workflowId: "wf-1",
+      userId: TEST_USER_ID,
     })
+    assert.strictEqual(typeof callArg.id, "string")
   })
 })
 
