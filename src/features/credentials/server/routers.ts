@@ -97,7 +97,9 @@ export const credentialsRouter = createTRPCRouter({
       const credential = await db.orm.public.Credential.where({
         id: input.id,
         userId: ctx.auth.user.id,
-      }).first()
+      })
+        .select("id", "name", "type", "createdAt", "updatedAt")
+        .first()
 
       if (!credential) {
         throw new TRPCError({

@@ -76,7 +76,6 @@ interface CredentialFormProps {
     id?: string
     name: string
     type: CredentialType
-    value: string
   }
 }
 
@@ -95,9 +94,9 @@ export function CredentialForm({ initialData }: CredentialFormProps) {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: initialData || {
-      name: "",
-      type: CredentialType.OPENAI,
+    defaultValues: {
+      name: initialData?.name ?? "",
+      type: initialData?.type ?? CredentialType.OPENAI,
       value: "",
     },
   })
