@@ -6,6 +6,7 @@ import { NonRetriableError } from "inngest"
 import { CredentialType } from "@/config/constants"
 import type { NodeExecutor } from "@/features/executions/types"
 import { geminiChannel } from "@/inngest/channels/gemini"
+import { decrypt } from "@/lib/encryption"
 import { db } from "@/prisma/db"
 
 /** Stringifies a value for use inside Handlebars templates: `{{json value}}`. */
@@ -86,7 +87,7 @@ export const geminiExecutor: NodeExecutor<GeminiData> = async ({
   }
 
   const google = createGoogle({
-    apiKey: credential.value,
+    apiKey: decrypt(credential.value),
   })
 
   try {

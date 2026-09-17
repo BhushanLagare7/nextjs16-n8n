@@ -39,6 +39,7 @@
     "client-only": "^0.0.1",
     "clsx": "^2.1.1",
     "cn": "^0.2.5",
+    "cryptr": "^6.4.0",
     "date-fns": "^4.4.0",
     "dotenv": "^17.4.2",
     "handlebars": "^4.7.9",
@@ -69,6 +70,7 @@
   "devDependencies": {
     "@prisma/cli-engine": "^0.2.3",
     "@tailwindcss/postcss": "^4",
+    "@types/cryptr": "^4.0.3",
     "@types/node": "^20",
     "@types/pg": "^8.23.1",
     "@types/react": "^19",

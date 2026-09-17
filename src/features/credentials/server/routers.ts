@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server"
 import { z } from "zod"
 
 import { CredentialType, PAGINATION } from "@/config/constants"
+import { encrypt } from "@/lib/encryption"
 import { db } from "@/prisma/db"
 import {
   createTRPCRouter,
@@ -33,7 +34,7 @@ export const credentialsRouter = createTRPCRouter({
         name,
         userId: ctx.auth.user.id,
         type,
-        value,
+        value: encrypt(value),
       })
     }),
 
@@ -77,7 +78,7 @@ export const credentialsRouter = createTRPCRouter({
       }).update({
         name,
         type,
-        value,
+        value: encrypt(value),
       })
 
       if (!credential) {
