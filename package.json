@@ -12,7 +12,7 @@
     "format": "eslint --fix && prettier --write .",
     "format:check": "prettier --check . && eslint",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test src/**/*.test.ts",
+    "test": "tsx --test 'src/**/*.test.ts'",
     "contract:emit": "prisma contract emit",
     "inngest:dev": "inngest-cli dev",
     "ngrok:dev": "dotenv -- sh -c 'ngrok http --url=$NGROK_URL 3000'",

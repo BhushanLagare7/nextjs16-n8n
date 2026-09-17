@@ -1,6 +1,6 @@
-import { parseAsInteger, parseAsString } from "nuqs/server"
+import { parseAsString } from "nuqs/server"
 
-import { PAGINATION } from "@/config/constants"
+import { paginationParams } from "@/lib/pagination"
 
 /**
  * URL query param schema for the credentials list page.
@@ -8,11 +8,6 @@ import { PAGINATION } from "@/config/constants"
  * server-side loader for consistent parsing/serialization.
  */
 export const credentialsParams = {
-  page: parseAsInteger
-    .withDefault(PAGINATION.DEFAULT_PAGE)
-    .withOptions({ clearOnDefault: true }),
-  pageSize: parseAsInteger
-    .withDefault(PAGINATION.DEFAULT_PAGE_SIZE)
-    .withOptions({ clearOnDefault: true }),
+  ...paginationParams(),
   search: parseAsString.withDefault("").withOptions({ clearOnDefault: true }),
 }

@@ -100,25 +100,29 @@ describe("POST /api/webhooks/stripe", () => {
     assert.strictEqual(json.success, true)
 
     assert.strictEqual(inngestSendMock.mock.calls.length, 1)
-    assert.deepStrictEqual(inngestSendMock.mock.calls[0]?.arguments[0], {
-      name: "workflows/execute.workflow",
-      data: {
-        workflowId: "wf-stripe-1",
-        userId: "user-stripe-owner",
-        initialData: {
-          stripe: {
-            eventId: "evt_3Mkoq2LkdIwHu7ix0snNqP0",
-            eventType: "payment_intent.succeeded",
-            timestamp: 1679000000,
-            livemode: false,
-            raw: payload.data.object,
-            amount: 2000,
-            currency: "usd",
-            customerId: "cus_abc",
-          },
+    const callArg = inngestSendMock.mock.calls[0]?.arguments[0] as {
+      name: string
+      data: unknown
+      id: string
+    }
+    assert.strictEqual(callArg.name, "workflows/execute.workflow")
+    assert.deepStrictEqual(callArg.data, {
+      workflowId: "wf-stripe-1",
+      userId: "user-stripe-owner",
+      initialData: {
+        stripe: {
+          eventId: "evt_3Mkoq2LkdIwHu7ix0snNqP0",
+          eventType: "payment_intent.succeeded",
+          timestamp: 1679000000,
+          livemode: false,
+          raw: payload.data.object,
+          amount: 2000,
+          currency: "usd",
+          customerId: "cus_abc",
         },
       },
     })
+    assert.strictEqual(typeof callArg.id, "string")
   })
 
   it("returns 404 when workflow is not found", async (t) => {

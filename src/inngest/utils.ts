@@ -1,3 +1,4 @@
+import { createId } from "@paralleldrive/cuid2"
 import toposort from "toposort"
 
 import type { FieldOutputTypes } from "@/prisma/contract.d"
@@ -72,5 +73,6 @@ export const sendWorkflowExecution = async (data: {
   return inngest.send({
     name: "workflows/execute.workflow",
     data,
+    id: createId(),
   })
 }

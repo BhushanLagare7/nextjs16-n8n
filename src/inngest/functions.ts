@@ -1,7 +1,7 @@
 // src/inngest/functions.ts
 import { NonRetriableError, type Realtime } from "inngest"
 
-import { NodeType } from "@/config/constants"
+import { ExecutionStatus, NodeType } from "@/config/constants"
 import { getExecutor } from "@/features/executions/lib/executor-registry"
 import { db } from "@/prisma/db"
 
@@ -11,22 +11,42 @@ import { topologicalSort } from "./utils"
 /**
  * Inngest background function that runs a workflow end-to-end.
  *
- * 1. Loads the workflow with its nodes and connections.
- * 2. Topologically sorts nodes to determine execution order.
- * 3. Executes nodes sequentially, threading a shared context between them.
+ * 1. Creates an execution record tracking workflow progress.
+ * 2. Loads the workflow with its nodes and connections.
+ * 3. Topologically sorts nodes to determine execution order.
+ * 4. Executes nodes sequentially, threading a shared context between them.
+ * 5. Updates execution status on success or failure.
  */
 export const executeWorkflow = inngest.createFunction(
   {
     id: "execute-workflow",
     triggers: [{ event: "workflows/execute.workflow" }],
+    retries: 0,
+    onFailure: async ({ event }) => {
+      return db.orm.public.Execution.where({
+        inngestEventId: event.data.event.id,
+      }).update({
+        status: ExecutionStatus.FAILED,
+        error: event.data.error.message,
+        errorStack: event.data.error.stack,
+      })
+    },
   },
   async ({ event, step }) => {
-    const workflowId = event.data.workflowId
+    const inngestEventId = event.id
+    const workflowId = event.data.workflowId as string | undefined
     const userId = event.data.userId as string | undefined
 
-    if (!workflowId) {
-      throw new NonRetriableError("Workflow ID is missing")
+    if (!inngestEventId || !workflowId) {
+      throw new NonRetriableError("Event ID or workflow ID is missing")
     }
+
+    await step.run("create-execution", async () => {
+      return db.orm.public.Execution.create({
+        workflowId,
+        inngestEventId,
+      })
+    })
 
     /**
      * Publishes a realtime message via `step.realtime.publish`, so executors
@@ -98,6 +118,17 @@ export const executeWorkflow = inngest.createFunction(
         publish,
       })
     }
+
+    await step.run("update-execution", async () => {
+      return db.orm.public.Execution.where({
+        inngestEventId,
+        workflowId,
+      }).update({
+        status: ExecutionStatus.SUCCESS,
+        completedAt: new Date().toISOString(),
+        output: context,
+      })
+    })
 
     return {
       workflowId,

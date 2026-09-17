@@ -47,3 +47,20 @@ export const CredentialType = {
 /** Union of all credential type string literals */
 export type CredentialType =
   (typeof CredentialType)[keyof typeof CredentialType]
+
+/**
+ * Workflow execution statuses matching the database schema in contract.prisma.
+ * `satisfies` ensures every value is a valid `Execution.status` at compile time.
+ */
+export const ExecutionStatus = {
+  RUNNING: "RUNNING",
+  SUCCESS: "SUCCESS",
+  FAILED: "FAILED",
+} as const satisfies Record<
+  string,
+  FieldOutputTypes["public"]["Execution"]["status"]
+>
+
+/** Union of all execution status string literals */
+export type ExecutionStatus =
+  (typeof ExecutionStatus)[keyof typeof ExecutionStatus]
