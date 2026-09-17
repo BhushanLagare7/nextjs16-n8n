@@ -270,7 +270,7 @@ export const workflowsRouter = createTRPCRouter({
       // Run the paginated fetch and total count concurrently
       const [items, total] = await Promise.all([
         query
-          .orderBy((w) => w.updatedAt.desc()) // most recently edited first
+          .orderBy([(w) => w.updatedAt.desc(), (w) => w.id.desc()]) // most recently edited first
           .offset((page - 1) * pageSize)
           .limit(pageSize)
           .all(),

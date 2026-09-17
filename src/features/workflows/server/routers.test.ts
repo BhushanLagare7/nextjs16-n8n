@@ -170,7 +170,7 @@ interface MockGetManyOptions<Item> {
  */
 const createGetManyQueryMock = <Item>(options: MockGetManyOptions<Item>) => {
   const chainedWherePredicates: Array<(w: unknown) => unknown> = []
-  let capturedOrderByFn: ((w: unknown) => unknown) | null = null
+  let capturedOrderByFns: Array<(w: unknown) => unknown> | null = null
   let capturedOffset: number | null = null
   let capturedLimit: number | null = null
 
@@ -179,8 +179,8 @@ const createGetManyQueryMock = <Item>(options: MockGetManyOptions<Item>) => {
       chainedWherePredicates.push(predicate)
       return queryChain
     },
-    orderBy(fn: (w: unknown) => unknown) {
-      capturedOrderByFn = fn
+    orderBy(fn: ((w: unknown) => unknown) | Array<(w: unknown) => unknown>) {
+      capturedOrderByFns = Array.isArray(fn) ? fn : [fn]
       return {
         offset(offsetVal: number) {
           capturedOffset = offsetVal
@@ -201,9 +201,10 @@ const createGetManyQueryMock = <Item>(options: MockGetManyOptions<Item>) => {
   return {
     queryChain,
     chainedWherePredicates,
-    getCapturedOrderBy: () => capturedOrderByFn,
+    getCapturedOrderByFns: () => capturedOrderByFns,
     getCapturedOffset: () => capturedOffset,
     getCapturedLimit: () => capturedLimit,
+    getChainedWherePredicates: () => chainedWherePredicates,
   }
 }
 
@@ -929,7 +930,7 @@ describe("workflowsRouter.getMany query execution and pagination", () => {
 
     const {
       queryChain,
-      getCapturedOrderBy,
+      getCapturedOrderByFns,
       getCapturedOffset,
       getCapturedLimit,
     } = createGetManyQueryMock({
@@ -962,13 +963,27 @@ describe("workflowsRouter.getMany query execution and pagination", () => {
     assert.strictEqual(eqMock.mock.calls.length, 1)
     assert.strictEqual(eqMock.mock.calls[0]?.arguments[0], TEST_USER_ID)
 
-    // Verify orderBy clause sorts by updatedAt desc
-    const orderByFn = getCapturedOrderBy() as (w: {
-      updatedAt: { desc: () => unknown }
-    }) => unknown
-    const descMock = t.mock.fn()
-    orderByFn({ updatedAt: { desc: descMock } })
-    assert.strictEqual(descMock.mock.calls.length, 1)
+    // Verify orderBy clause sorts by updatedAt desc, then id desc
+    const orderByFns = getCapturedOrderByFns() as Array<
+      (w: {
+        updatedAt: { desc: () => unknown }
+        id: { desc: () => unknown }
+      }) => unknown
+    >
+    assert.ok(orderByFns)
+    assert.strictEqual(orderByFns.length, 2)
+    const updatedAtDescMock = t.mock.fn()
+    orderByFns[0]!({
+      updatedAt: { desc: updatedAtDescMock },
+      id: { desc: t.mock.fn() },
+    })
+    assert.strictEqual(updatedAtDescMock.mock.calls.length, 1)
+    const idDescMock = t.mock.fn()
+    orderByFns[1]!({
+      updatedAt: { desc: t.mock.fn() },
+      id: { desc: idDescMock },
+    })
+    assert.strictEqual(idDescMock.mock.calls.length, 1)
   })
 
   it("derives hasNextPage=false and hasPreviousPage=true on the last page", async (t) => {

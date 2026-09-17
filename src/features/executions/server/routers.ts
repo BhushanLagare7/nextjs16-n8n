@@ -74,7 +74,7 @@ export const executionsRouter = createTRPCRouter({
       const [items, total] = await Promise.all([
         query
           .include("workflow", (wf) => wf.select("id", "name"))
-          .orderBy((e) => e.startedAt.desc())
+          .orderBy([(e) => e.startedAt.desc(), (e) => e.id.desc()])
           .offset((page - 1) * pageSize)
           .limit(pageSize)
           .all(),

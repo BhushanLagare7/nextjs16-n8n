@@ -1,6 +1,4 @@
-import { parseAsInteger } from "nuqs/server"
-
-import { PAGINATION } from "@/config/constants"
+import { paginationParams } from "@/lib/pagination"
 
 /**
  * URL query param schema for the executions list page.
@@ -8,10 +6,5 @@ import { PAGINATION } from "@/config/constants"
  * server-side loader for consistent parsing/serialization.
  */
 export const executionsParams = {
-  page: parseAsInteger
-    .withDefault(PAGINATION.DEFAULT_PAGE)
-    .withOptions({ clearOnDefault: true }),
-  pageSize: parseAsInteger
-    .withDefault(PAGINATION.DEFAULT_PAGE_SIZE)
-    .withOptions({ clearOnDefault: true }),
+  ...paginationParams(),
 }
