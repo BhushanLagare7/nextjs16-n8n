@@ -6,6 +6,7 @@ import { NonRetriableError } from "inngest"
 import { CredentialType } from "@/config/constants"
 import type { NodeExecutor } from "@/features/executions/types"
 import { openAiChannel } from "@/inngest/channels/openai"
+import { decrypt } from "@/lib/encryption"
 import { db } from "@/prisma/db"
 
 /** Stringifies a value for use inside Handlebars templates: `{{json value}}`. */
@@ -86,7 +87,7 @@ export const openAiExecutor: NodeExecutor<OpenAiData> = async ({
   }
 
   const openai = createOpenAI({
-    apiKey: credential.value,
+    apiKey: decrypt(credential.value),
   })
 
   try {

@@ -29,6 +29,12 @@ import { useExecutionsParams } from "../hooks/use-executions-params"
 export type ExecutionListItem =
   RouterOutputs["executions"]["getMany"]["items"][number]
 
+/**
+ * Maps an execution status to its representative icon.
+ *
+ * @param status - Execution status
+ * @returns Icon element for the given status
+ */
 const getStatusIcon = (status: ExecutionStatus) => {
   switch (status) {
     case ExecutionStatus.SUCCESS:
@@ -42,10 +48,17 @@ const getStatusIcon = (status: ExecutionStatus) => {
   }
 }
 
+/**
+ * Converts an execution status enum value into a display-friendly label.
+ *
+ * @param status - Execution status
+ * @returns Capitalized, human-readable status string
+ */
 const formatStatus = (status: ExecutionStatus) => {
   return status.charAt(0) + status.slice(1).toLowerCase()
 }
 
+/** Renders the list of executions, falling back to an empty state. */
 export const ExecutionsList = () => {
   const executions = useSuspenseExecutions()
 
@@ -59,6 +72,7 @@ export const ExecutionsList = () => {
   )
 }
 
+/** Header section for the executions page. */
 export const ExecutionsHeader = () => {
   return (
     <EntityHeader
@@ -68,6 +82,7 @@ export const ExecutionsHeader = () => {
   )
 }
 
+/** Pagination controls synced with executions query params. */
 export const ExecutionsPagination = () => {
   const executions = useSuspenseExecutions()
   const [params, setParams] = useExecutionsParams()
@@ -82,6 +97,11 @@ export const ExecutionsPagination = () => {
   )
 }
 
+/**
+ * Layout wrapper combining the header, pagination, and page content.
+ *
+ * @param children - Content rendered between header and pagination
+ */
 export const ExecutionsContainer = ({
   children,
 }: {
@@ -97,20 +117,28 @@ export const ExecutionsContainer = ({
   )
 }
 
+/** Loading state for the executions list. */
 export const ExecutionsLoading = () => {
   return <LoadingView message="Loading executions..." />
 }
 
+/** Error state for the executions list. */
 export const ExecutionsError = () => {
   return <ErrorView message="Error loading executions" />
 }
 
+/** Empty state shown when no executions exist. */
 export const ExecutionsEmpty = () => {
   return (
     <EmptyView message="You haven't created any executions yet. Get started by running your first workflow" />
   )
 }
 
+/**
+ * Renders a single execution entry with status, workflow name, and timing.
+ *
+ * @param data - Execution record to display
+ */
 export const ExecutionItem = ({ data }: { data: ExecutionListItem }) => {
   const duration = data.completedAt
     ? Math.round(

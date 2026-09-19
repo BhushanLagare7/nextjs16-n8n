@@ -76,12 +76,13 @@ interface CredentialFormProps {
     id?: string
     name: string
     type: CredentialType
-    value: string
   }
 }
 
 /**
  * Form for creating or editing a credential.
+ *
+ * @param initialData - Existing credential data; presence of `id` enables edit mode
  */
 export function CredentialForm({ initialData }: CredentialFormProps) {
   const router = useRouter()
@@ -93,9 +94,9 @@ export function CredentialForm({ initialData }: CredentialFormProps) {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: initialData || {
-      name: "",
-      type: CredentialType.OPENAI,
+    defaultValues: {
+      name: initialData?.name ?? "",
+      type: initialData?.type ?? CredentialType.OPENAI,
       value: "",
     },
   })
@@ -219,7 +220,10 @@ export function CredentialForm({ initialData }: CredentialFormProps) {
 }
 
 /**
- * Suspense-backed view component for loading and editing a single credential.
+ * Suspense-backed view that loads a credential by ID and renders
+ * the edit form once data is available.
+ *
+ * @param credentialId - ID of the credential to load
  */
 export function CredentialView({ credentialId }: { credentialId: string }) {
   const { data: credential } = useSuspenseCredential(credentialId)

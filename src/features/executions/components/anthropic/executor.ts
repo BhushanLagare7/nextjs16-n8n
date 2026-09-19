@@ -6,6 +6,7 @@ import { NonRetriableError } from "inngest"
 import { CredentialType } from "@/config/constants"
 import type { NodeExecutor } from "@/features/executions/types"
 import { anthropicChannel } from "@/inngest/channels/anthropic"
+import { decrypt } from "@/lib/encryption"
 import { db } from "@/prisma/db"
 
 /** Stringifies a value for use inside Handlebars templates: `{{json value}}`. */
@@ -88,7 +89,7 @@ export const anthropicExecutor: NodeExecutor<AnthropicData> = async ({
   }
 
   const anthropic = createAnthropic({
-    apiKey: credential.value,
+    apiKey: decrypt(credential.value),
   })
 
   try {

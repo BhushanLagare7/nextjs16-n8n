@@ -27,6 +27,12 @@ import {
 import { ExecutionStatus } from "@/config/constants"
 import { useSuspenseExecution } from "@/features/executions/hooks/use-executions"
 
+/**
+ * Returns the status icon associated with an execution status.
+ *
+ * @param status - Execution status
+ * @returns Icon element representing the status
+ */
 const getStatusIcon = (status: ExecutionStatus) => {
   switch (status) {
     case ExecutionStatus.SUCCESS:
@@ -40,10 +46,22 @@ const getStatusIcon = (status: ExecutionStatus) => {
   }
 }
 
+/**
+ * Formats an execution status enum into a human-readable label.
+ *
+ * @param status - Execution status
+ * @returns Capitalized status label
+ */
 const formatStatus = (status: ExecutionStatus) => {
   return status.charAt(0) + status.slice(1).toLowerCase()
 }
 
+/**
+ * Displays detailed information for a single workflow execution,
+ * including status, timing, output, and error details.
+ *
+ * @param executionId - ID of the execution to display
+ */
 export const ExecutionView = ({ executionId }: { executionId: string }) => {
   const { data: execution } = useSuspenseExecution(executionId)
   const [showStackTrace, setShowStackTrace] = useState(false)
