@@ -28,6 +28,8 @@ import {
 import { Input } from "@/components/ui/input"
 import { authClient } from "@/lib/auth-client"
 
+import { OAuthErrorAlert } from "./oauth-error-alert"
+
 const registerSchema = z
   .object({
     email: z.email("Please enter a valid email address"),
@@ -43,8 +45,8 @@ type RegisterFormValues = z.infer<typeof registerSchema>
 
 /**
  * Registration form.
- * Creates an account via email/password or social provider,
- * redirecting to home on success.
+ * Creates an account via email/password or social provider, redirecting
+ * to home on success.
  */
 export function RegisterForm() {
   const router = useRouter()
@@ -60,7 +62,11 @@ export function RegisterForm() {
 
   const signInGithub = async () => {
     await authClient.signIn.social(
-      { provider: "github" },
+      {
+        provider: "github",
+        callbackURL: "/",
+        errorCallbackURL: "/signup",
+      },
       {
         onSuccess: () => {
           router.push("/")
@@ -74,7 +80,11 @@ export function RegisterForm() {
 
   const signInGoogle = async () => {
     await authClient.signIn.social(
-      { provider: "google" },
+      {
+        provider: "google",
+        callbackURL: "/",
+        errorCallbackURL: "/signup",
+      },
       {
         onSuccess: () => {
           router.push("/")
@@ -118,6 +128,7 @@ export function RegisterForm() {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)}>
               <div className="grid gap-6">
+                <OAuthErrorAlert />
                 <div className="flex flex-col gap-4">
                   <Button
                     className="w-full"

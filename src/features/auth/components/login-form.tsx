@@ -28,6 +28,8 @@ import {
 import { Input } from "@/components/ui/input"
 import { authClient } from "@/lib/auth-client"
 
+import { OAuthErrorAlert } from "./oauth-error-alert"
+
 const loginSchema = z.object({
   email: z.email("Please enter a valid email address"),
   password: z.string().min(1, "Password is required"),
@@ -37,8 +39,8 @@ type LoginFormValues = z.infer<typeof loginSchema>
 
 /**
  * Login form.
- * Authenticates via email/password or social provider,
- * redirecting to home on success.
+ * Authenticates via email/password or social provider, redirecting to
+ * home on success.
  */
 export function LoginForm() {
   const router = useRouter()
@@ -53,7 +55,11 @@ export function LoginForm() {
 
   const signInGithub = async () => {
     await authClient.signIn.social(
-      { provider: "github" },
+      {
+        provider: "github",
+        callbackURL: "/",
+        errorCallbackURL: "/login",
+      },
       {
         onSuccess: () => {
           router.push("/")
@@ -67,7 +73,11 @@ export function LoginForm() {
 
   const signInGoogle = async () => {
     await authClient.signIn.social(
-      { provider: "google" },
+      {
+        provider: "google",
+        callbackURL: "/",
+        errorCallbackURL: "/login",
+      },
       {
         onSuccess: () => {
           router.push("/")
@@ -110,6 +120,7 @@ export function LoginForm() {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)}>
               <div className="grid gap-6">
+                <OAuthErrorAlert />
                 <div className="flex flex-col gap-4">
                   <Button
                     className="w-full"
