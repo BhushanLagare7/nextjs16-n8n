@@ -28,7 +28,6 @@ import {
 import { Input } from "@/components/ui/input"
 import { authClient } from "@/lib/auth-client"
 
-// Validation schema for the login form
 const loginSchema = z.object({
   email: z.email("Please enter a valid email address"),
   password: z.string().min(1, "Password is required"),
@@ -37,9 +36,9 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>
 
 /**
- * Login form component.
- * Handles sign-in via email/password and redirects
- * to home on success.
+ * Login form.
+ * Authenticates via email/password or social provider,
+ * redirecting to home on success.
  */
 export function LoginForm() {
   const router = useRouter()
@@ -52,8 +51,34 @@ export function LoginForm() {
     },
   })
 
-  // Submit handler: authenticates then redirects,
-  // or shows a toast on failure
+  const signInGithub = async () => {
+    await authClient.signIn.social(
+      { provider: "github" },
+      {
+        onSuccess: () => {
+          router.push("/")
+        },
+        onError: () => {
+          toast.error("Something went wrong")
+        },
+      }
+    )
+  }
+
+  const signInGoogle = async () => {
+    await authClient.signIn.social(
+      { provider: "google" },
+      {
+        onSuccess: () => {
+          router.push("/")
+        },
+        onError: () => {
+          toast.error("Something went wrong")
+        },
+      }
+    )
+  }
+
   const onSubmit = async (values: LoginFormValues) => {
     await authClient.signIn.email(
       {
@@ -85,13 +110,13 @@ export function LoginForm() {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)}>
               <div className="grid gap-6">
-                {/* Social login options (not yet wired up) */}
                 <div className="flex flex-col gap-4">
                   <Button
                     className="w-full"
                     disabled={isPending}
                     type="button"
                     variant="outline"
+                    onClick={signInGithub}
                   >
                     <GithubLogo aria-hidden="true" size={20} />
                     Continue with GitHub
@@ -101,12 +126,12 @@ export function LoginForm() {
                     disabled={isPending}
                     type="button"
                     variant="outline"
+                    onClick={signInGoogle}
                   >
                     <GoogleLogo aria-hidden="true" size={20} />
                     Continue with Google
                   </Button>
                 </div>
-                {/* Email/password login fields */}
                 <div className="grid gap-6">
                   <FormField
                     control={form.control}
