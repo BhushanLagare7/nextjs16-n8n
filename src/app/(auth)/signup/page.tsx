@@ -1,5 +1,16 @@
+import type { Metadata } from "next"
+
 import { RegisterForm } from "@/features/auth/components/register-form"
 import { requireUnauth } from "@/lib/auth-utils"
+
+export const metadata: Metadata = {
+  title: "Create Account",
+  description:
+    "Create your Nodemation account and start designing event-driven workflow automations with AI and integrations.",
+  alternates: {
+    canonical: "/signup",
+  },
+}
 
 /**
  * Signup page — only accessible to unauthenticated users.

@@ -1,5 +1,11 @@
+import type { Metadata } from "next"
+
 import { CredentialForm } from "@/features/credentials/components/credential"
 import { requireAuth } from "@/lib/auth-utils"
+
+export const metadata: Metadata = {
+  title: "New Credential",
+}
 
 /**
  * Page for creating a new credential (protected route)
