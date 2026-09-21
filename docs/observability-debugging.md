@@ -2,7 +2,7 @@
 
 ## Sentry Observability Architecture
 
-Sentry is integrated across all Next.js application runtimes to capture errors, distributed traces, and session replays:
+Sentry spans all Next.js application runtimes, while capabilities vary by runtime: distributed tracing is enabled in server and edge configurations, and session replay is configured only through `src/instrumentation-client.ts`:
 
 | Runtime            | Configuration File                                   | Purpose                                                                |
 | :----------------- | :--------------------------------------------------- | :--------------------------------------------------------------------- |
