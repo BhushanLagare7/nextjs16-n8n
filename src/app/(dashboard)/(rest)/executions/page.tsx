@@ -1,5 +1,6 @@
 import { Suspense } from "react"
 import { ErrorBoundary } from "react-error-boundary"
+import type { Metadata } from "next"
 
 import type { SearchParams } from "nuqs"
 
@@ -13,6 +14,10 @@ import { executionsParamsLoader } from "@/features/executions/server/params-load
 import { prefetchExecutions } from "@/features/executions/server/prefetch"
 import { requireAuth } from "@/lib/auth-utils"
 import { HydrateClient } from "@/trpc/server"
+
+export const metadata: Metadata = {
+  title: "Executions",
+}
 
 type Props = {
   searchParams: Promise<SearchParams>

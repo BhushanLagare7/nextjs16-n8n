@@ -1,25 +1,99 @@
 import "./globals.css"
 
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 
 import { Provider } from "jotai"
 import { NuqsAdapter } from "nuqs/adapters/next/app"
 
+import {
+  getWebApplicationJsonLd,
+  getWebSiteJsonLd,
+  JsonLd,
+} from "@/components/seo/json-ld"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/sonner"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { siteConfig } from "@/config/site"
 import { cn } from "@/lib/utils"
 import { TRPCReactProvider } from "@/trpc/client"
+
+/**
+ * Separate Viewport export required by Next.js 14+ / 16.
+ */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#09090b" },
+  ],
+  colorScheme: "dark light",
+}
 
 /**
  * Global metadata configuration.
  */
 export const metadata: Metadata = {
-  title: "Nodemation",
-  description: "Nodemation application built with Next.js and shadcn/ui",
+  metadataBase: new URL(siteConfig.url),
+  title: {
+    default: siteConfig.title,
+    template: `%s | ${siteConfig.name}`,
+  },
+  description: siteConfig.description,
+  keywords: [...siteConfig.keywords],
+  authors: [{ name: siteConfig.author.name, url: siteConfig.author.url }],
+  creator: siteConfig.author.name,
+  publisher: siteConfig.name,
+  category: "technology",
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
+  },
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: siteConfig.url,
+    siteName: siteConfig.name,
+    title: siteConfig.title,
+    description: siteConfig.description,
+    images: [
+      {
+        url: siteConfig.ogImage,
+        width: 1200,
+        height: 630,
+        alt: siteConfig.title,
+        type: "image/png",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: siteConfig.title,
+    description: siteConfig.description,
+    images: [siteConfig.ogImage],
+  },
   icons: {
     icon: "/logos/logo.svg",
+    shortcut: "/favicon.ico",
+    apple: "/logos/logo.svg",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
   },
 }
 
@@ -60,6 +134,8 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body suppressHydrationWarning>
+        <JsonLd data={getWebSiteJsonLd()} />
+        <JsonLd data={getWebApplicationJsonLd()} />
         <ThemeProvider>
           <TooltipProvider>
             <TRPCReactProvider>

@@ -1,5 +1,6 @@
 import { Suspense } from "react"
 import { ErrorBoundary } from "react-error-boundary"
+import type { Metadata } from "next"
 
 import { CredentialView } from "@/features/credentials/components/credential"
 import {
@@ -9,6 +10,10 @@ import {
 import { prefetchCredential } from "@/features/credentials/server/prefetch"
 import { requireAuth } from "@/lib/auth-utils"
 import { HydrateClient } from "@/trpc/server"
+
+export const metadata: Metadata = {
+  title: "Edit Credential",
+}
 
 interface CredentialIdPageProps {
   params: Promise<{ credentialId: string }>

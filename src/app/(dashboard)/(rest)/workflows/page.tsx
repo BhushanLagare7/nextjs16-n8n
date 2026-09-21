@@ -1,5 +1,6 @@
 import { Suspense } from "react"
 import { ErrorBoundary } from "react-error-boundary"
+import type { Metadata } from "next"
 
 import type { SearchParams } from "nuqs/server"
 
@@ -13,6 +14,10 @@ import { workflowsParamsLoader } from "@/features/workflows/server/params-loader
 import { prefetchWorkflows } from "@/features/workflows/server/prefetch"
 import { requireAuth } from "@/lib/auth-utils"
 import { HydrateClient } from "@/trpc/server"
+
+export const metadata: Metadata = {
+  title: "Workflows",
+}
 
 type Props = {
   searchParams: Promise<SearchParams>

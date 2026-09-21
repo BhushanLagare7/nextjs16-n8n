@@ -1,5 +1,6 @@
 import { Suspense } from "react"
 import { ErrorBoundary } from "react-error-boundary"
+import type { Metadata } from "next"
 
 import { ExecutionView } from "@/features/executions/components/execution"
 import {
@@ -9,6 +10,10 @@ import {
 import { prefetchExecution } from "@/features/executions/server/prefetch"
 import { requireAuth } from "@/lib/auth-utils"
 import { HydrateClient } from "@/trpc/server"
+
+export const metadata: Metadata = {
+  title: "Execution Details",
+}
 
 interface ExecutionIdPageProps {
   params: Promise<{ executionId: string }>
